@@ -1,0 +1,17 @@
+node_modules/
+.DS_Store
+.env
+.env.*
+!.env.example
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+coverage/
+.nyc_output/
+.prismo/
+prismo-dev-report.md
+prismo-dev-report.md.*.bak
+prismo-optimized-CLAUDE.template.md
+prismo-AGENTS-recommendations.md
+.claudeignore.prismo-suggested
