@@ -10,6 +10,7 @@ MIT license
 
 - repo scan — finds big files, generated folders, missing ignores, and oversized instruction docs
 - local usage — reads codex and claude code logs when token fields are available
+- claude code cost — shows session spend, cache write/read cost, cost drivers, avoidable spend, and next actions
 - context packs — writes compact `.prismo/` files for frontend, backend, auth, and architecture work
 - safe fixes — suggests or creates `.claudeignore`, `CLAUDE.md`, and `AGENTS.md` improvements
 - offline first — no api keys, no account, no provider login
@@ -27,6 +28,8 @@ npx getprismo scan --usage
 ```bash
 npx getprismo scan --usage
 npx getprismo scan --fix
+npx getprismo cc
+npx getprismo cc last 5
 npx getprismo optimize
 npx getprismo context frontend
 npx getprismo setup

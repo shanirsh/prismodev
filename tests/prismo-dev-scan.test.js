@@ -349,6 +349,64 @@ test("usage summary reads exact Claude Code message usage from local JSONL", () 
   }
 });
 
+test("cc command reports Claude Code token costs and cache savings", () => {
+  const root = tempRepo();
+  const claudeHome = tempRepo();
+  const safeProject = root.replace(/[\/\\:]/g, "-").replace(/^-/, "-");
+  const projectDir = path.join(claudeHome, "projects", safeProject);
+  fs.mkdirSync(projectDir, { recursive: true });
+  fs.writeFileSync(path.join(projectDir, "claude-cost.jsonl"), [
+    JSON.stringify({
+      type: "assistant",
+      timestamp: "2026-05-08T10:01:00Z",
+      requestId: "req-1",
+      message: {
+        id: "msg-1",
+        role: "assistant",
+        model: "claude-sonnet-4-20250514",
+        usage: {
+          input_tokens: 50000,
+          cache_creation_input_tokens: 5000,
+          cache_read_input_tokens: 100000,
+          output_tokens: 10000,
+        },
+        content: [{ type: "text", text: "done" }],
+      },
+    }),
+  ].join("\n"), "utf8");
+
+  const env = { ...process.env, PRISMO_CLAUDE_HOME: claudeHome, PRISMO_CODEX_HOME: path.join(root, "none") };
+  const json = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "cc", "--json", root],
+    { encoding: "utf8", env }
+  );
+  assert.equal(json.status, 0, json.stderr);
+  const payload = JSON.parse(json.stdout);
+  assert.equal(payload.sessions[0].cost.model, "Claude Sonnet 4");
+  assert.equal(payload.totals.inputTokens, 50000);
+  assert.equal(payload.totals.outputTokens, 10000);
+  assert.equal(payload.totals.cacheCreationTokens, 5000);
+  assert.equal(payload.totals.cacheReadTokens, 100000);
+  assert.equal(Number(payload.totals.totalCost.toFixed(4)), 0.3488);
+  assert.ok(payload.totals.cacheSavings > 0);
+  assert.ok(payload.insights.estimatedAvoidableCost > 0);
+  assert.ok(payload.insights.costDrivers.length > 0);
+  assert.ok(payload.sessions[0].prismo.recommendations.some((rec) => rec.includes("optimize") || rec.includes("scan --usage")));
+
+  const terminal = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "cc", "last", "1", root],
+    { encoding: "utf8", env }
+  );
+  assert.equal(terminal.status, 0, terminal.stderr);
+  assert.ok(terminal.stdout.includes("Prismo Claude Code Cost"));
+  assert.ok(terminal.stdout.includes("Claude Sonnet 4"));
+  assert.ok(terminal.stdout.includes("Cache saved you"));
+  assert.ok(terminal.stdout.includes("Prismo Diagnosis"));
+  assert.ok(terminal.stdout.includes("Better Next Actions"));
+});
+
 test("usage terminal output and watch --once --json are script-friendly", () => {
   const root = tempRepo();
   const codexHome = tempRepo();
@@ -383,6 +441,17 @@ test("usage terminal output and watch --once --json are script-friendly", () => 
   assert.ok(terminal.stdout.includes("Prismo Usage"));
   assert.ok(terminal.stdout.includes("Exact local-log tokens"));
 
+  const allUsage = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "usage", "all", "--json", "--limit", "1", root],
+    { encoding: "utf8", env }
+  );
+  assert.equal(allUsage.status, 0, allUsage.stderr);
+  const allUsagePayload = JSON.parse(allUsage.stdout);
+  assert.equal(allUsagePayload.scannedPath, root);
+  assert.equal(allUsagePayload.sessions[0].tool, "codex");
+  assert.equal(allUsagePayload.sessions[0].cwd, root);
+
   const watch = spawnSync(
     process.execPath,
     [path.join(__dirname, "..", "bin", "prismo.js"), "watch", "codex", "--once", "--json", "--limit", "1", root],
@@ -405,6 +474,7 @@ test("usage terminal output and watch --once --json are script-friendly", () => 
   assert.ok(watchTerminal.stdout.includes("Active Session"));
   assert.ok(watchTerminal.stdout.includes("Live Warnings"));
   assert.ok(watchTerminal.stdout.includes("Next Action"));
+  assert.equal(watchTerminal.stdout.includes("Refreshing every"), false);
 });
 
 test("scan --usage folds exact local session usage into diagnostics", () => {
