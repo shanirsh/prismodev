@@ -1,101 +1,61 @@
-# PrismoDev
+# prismodev
 
-Open-source local CLI for finding token waste in AI coding workflows.
+find token waste before your coding agent eats the whole repo.
 
-PrismoDev finds and monitors token waste in local AI coding workflows, while Prismo core tracks exact API usage through the proxy.
+prismodev is a local cli for codex, claude code, cursor, and other ai coding workflows. it scans your project, points out noisy files, reads local usage logs when they exist, and generates smaller context packs so your agent has less junk to carry around.
 
-```bash
-npx getprismo scan --usage
-npx getprismo setup
-npx getprismo watch
-```
+MIT license
 
-## Open Source Scope
+## what it does
 
-This repository contains the PrismoDev local CLI only:
+- repo scan — finds big files, generated folders, missing ignores, and oversized instruction docs
+- local usage — reads codex and claude code logs when token fields are available
+- context packs — writes compact `.prismo/` files for frontend, backend, auth, and architecture work
+- safe fixes — suggests or creates `.claudeignore`, `CLAUDE.md`, and `AGENTS.md` improvements
+- offline first — no api keys, no account, no provider login
 
-- repo scanning and token-waste diagnostics
-- local Codex and Claude Code usage-log summaries when logs expose token fields
-- generated `.prismo/` context packs and ignore-file recommendations
-- offline demo, setup, watch, scan, and optimize commands
-
-It does not include the hosted Prismo SaaS app, managed proxy, dashboard,
-billing, auth, provider vault, team features, or customer infrastructure.
-
-PrismoDev is licensed under the MIT License. See [LICENSE](LICENSE).
-
-## For Non-Builders
-
-If you do not have developer tools installed yet, install **Node.js LTS** from [nodejs.org](https://nodejs.org), open a new terminal, and check:
-
-```bash
-node -v
-npm -v
-npx -v
-```
-
-Then open your project folder in the terminal and run:
+## quickstart
 
 ```bash
 npx getprismo demo
 npx getprismo scan --simple
+npx getprismo scan --usage
 ```
 
-`demo` shows what PrismoDev does without reading your files. `scan --simple` gives a plain-English repo check with no API keys, no account login, and no file changes.
-
-## What It Does
-
-- Scans your repo for token-waste risks before a coding-agent session.
-- Reads local Codex and Claude Code logs when available to show real session usage.
-- Generates compact `.prismo/` context files for Claude Code, Codex, Cursor, and similar tools.
-- Recommends safer `.claudeignore`, `CLAUDE.md`, and `AGENTS.md` patterns.
-- Works offline and does not connect to OpenAI, Anthropic, Cursor, or billing accounts.
-
-## Tracking Modes
-
-```text
-Local scan: no API keys, heuristic repo/context risk
-Local logs: exact when Codex/Claude logs expose token fields
-Prismo proxy: exact usage/cost when traffic uses Prismo base URL
-```
-
-PrismoDev does not claim exact billing for hidden subscription coding-agent sessions. When provider traffic does not flow through Prismo, local usage is based on available session logs and deterministic estimates.
-
-## Quick Start
+## common commands
 
 ```bash
 npx getprismo scan --usage
+npx getprismo scan --fix
+npx getprismo optimize
+npx getprismo context frontend
 npx getprismo setup
 npx getprismo watch --once
 ```
 
-Use this flow to see value immediately:
+## how it works
 
-1. `scan --usage` finds repo/context risks and reads local Codex/Claude Code usage logs when available.
-2. `setup` shows which tracking modes are possible, including Prismo proxy readiness.
-3. `watch --once` shows the current live local session view with warnings and next action.
+1. run it inside a project folder
+2. prismodev scans local files and ignore rules
+3. it checks local codex and claude code logs if they exist
+4. it prints the biggest token-waste risks
+5. optional commands create safer ignore files and smaller context docs
 
-For a guided scan + context generation flow, run:
+## generated files
 
-```bash
-npx getprismo dev
+```text
+.prismo/architecture-summary.md
+.prismo/backend-summary.md
+.prismo/frontend-summary.md
+.prismo/recommended-CLAUDE.md
+.prismo/recommended-AGENTS.md
+.prismo/recommended-.claudeignore
+.prismo/optimize-report.md
 ```
 
-## Common Commands
+`optimize` writes templates and context packs. it does not overwrite your real `CLAUDE.md`, `AGENTS.md`, `.gitignore`, or `.claudeignore`.
 
-```bash
-npx getprismo scan --usage
-npx getprismo scan --simple
-npx getprismo setup
-npx getprismo watch
-npx getprismo scan --fix
-npx getprismo optimize
-npx getprismo context frontend
-npx getprismo usage codex
-npx getprismo usage claude
-```
-
-## Example Output
+## example
 
 ```text
 PrismoDev
@@ -116,76 +76,27 @@ Then: npx getprismo optimize
 Then: npx getprismo context frontend
 ```
 
-## Setup And Live Watch
+## project layout
 
-```bash
-npx getprismo setup
+```text
+bin/
+  prismo.js              # cli entrypoint
+lib/
+  prismo-dev-scan.js     # scanner, usage reader, reports, context generation
+tests/
+  prismo-dev-scan.test.js
 ```
 
-Setup is read-only. It detects Claude Code, Codex, Cursor, local logs, MCP/tool config, and whether the Prismo proxy is reachable for exact API tracking.
+## requirements
 
-```bash
-npx getprismo watch
-```
+node.js 18+
 
-Watch is the local live session view. It shows active session tokens, context risk, tool/output token spikes, largest context sources, top tools, warnings, and the next recommended action.
+## scope
 
-For machine-readable output:
+this repo is only the prismodev local cli.
 
-```bash
-npx getprismo setup --json
-npx getprismo watch --once --json
-```
+it does not include the hosted prismo app, managed proxy, dashboard, billing, auth, provider vault, team features, or customer infrastructure.
 
-## Local Usage Tracking
+## license
 
-Prismo can show real token usage when local tool logs expose token fields.
-
-- Codex: reads local `~/.codex/sessions/**/*.jsonl`
-- Claude Code: reads local `~/.claude/projects/**/*.jsonl`
-
-If exact usage fields are present, Prismo marks the result as `exact-local-log`. If not, it falls back to local text-size estimates.
-
-No API keys are required. Prismo does not proxy Claude Code subscription traffic or intercept prompts.
-
-## Generated Files
-
-`npx getprismo optimize` creates recommendation files in `.prismo/`:
-
-- `.prismo/architecture-summary.md`
-- `.prismo/backend-summary.md`
-- `.prismo/frontend-summary.md`
-- `.prismo/recommended-CLAUDE.md`
-- `.prismo/recommended-AGENTS.md`
-- `.prismo/recommended-.claudeignore`
-- `.prismo/optimize-report.md`
-
-These files are templates and context packs. Prismo does not overwrite your real `CLAUDE.md`, `AGENTS.md`, `.gitignore`, or `.claudeignore` during optimize.
-
-## Safe Fix Mode
-
-```bash
-npx getprismo scan --fix
-```
-
-Fix mode can create:
-
-- `.claudeignore` if missing
-- `.claudeignore.prismo-suggested` if `.claudeignore` already exists
-- `prismo-dev-report.md`
-- `prismo-optimized-CLAUDE.template.md`
-- `prismo-AGENTS-recommendations.md`
-
-Existing reports and suggestion files are backed up before replacement.
-
-## Help
-
-```bash
-npx getprismo --help
-npx getprismo scan --help
-npx getprismo demo
-npx getprismo setup --help
-npx getprismo watch --help
-npx getprismo optimize --help
-npx getprismo usage --help
-```
+MIT
