@@ -38,7 +38,10 @@ test("fix mode creates .claudeignore and report without overwriting existing rep
   const actions = applyFixes(result);
 
   assert.ok(fs.existsSync(path.join(root, ".claudeignore")));
+  assert.ok(fs.existsSync(path.join(root, ".cursorignore")));
   assert.ok(fs.readFileSync(path.join(root, ".claudeignore"), "utf8").includes("node_modules/"));
+  assert.ok(fs.readFileSync(path.join(root, ".cursorignore"), "utf8").includes("node_modules/"));
+  assert.ok(fs.readFileSync(path.join(root, ".cursorignore"), "utf8").includes(".prismo/"));
   assert.ok(fs.readFileSync(path.join(root, "prismo-dev-report.md"), "utf8").includes("PrismoDev Report"));
   assert.ok(actions.some((action) => action.includes("Backed up existing report")));
   assert.ok(fs.readdirSync(root).some((name) => name.startsWith("prismo-dev-report.md.") && name.endsWith(".bak")));
@@ -47,27 +50,32 @@ test("fix mode creates .claudeignore and report without overwriting existing rep
 test("existing .claudeignore creates .claudeignore.prismo-suggested instead of overwriting", () => {
   const root = tempRepo();
   fs.writeFileSync(path.join(root, ".claudeignore"), "custom-entry/\n", "utf8");
+  fs.writeFileSync(path.join(root, ".cursorignore"), "cursor-custom/\n", "utf8");
   fs.writeFileSync(path.join(root, ".gitignore"), "dist/\n", "utf8");
 
   const result = scanRepo(root);
   const actions = applyFixes(result);
 
   assert.equal(fs.readFileSync(path.join(root, ".claudeignore"), "utf8"), "custom-entry/\n");
+  assert.equal(fs.readFileSync(path.join(root, ".cursorignore"), "utf8"), "cursor-custom/\n");
   assert.ok(fs.existsSync(path.join(root, ".claudeignore.prismo-suggested")));
+  assert.ok(fs.existsSync(path.join(root, ".cursorignore.prismo-suggested")));
   assert.ok(fs.readFileSync(path.join(root, ".claudeignore.prismo-suggested"), "utf8").includes("dist/"));
+  assert.ok(fs.readFileSync(path.join(root, ".cursorignore.prismo-suggested"), "utf8").includes("dist/"));
   assert.ok(actions.some((action) => action.includes(".claudeignore.prismo-suggested")));
+  assert.ok(actions.some((action) => action.includes(".cursorignore.prismo-suggested")));
 });
 
 test("CLAUDE.md token estimate produces deterministic impact text and template", () => {
   const root = tempRepo();
-  fs.writeFileSync(path.join(root, "CLAUDE.md"), "a".repeat(2400), "utf8");
+  fs.writeFileSync(path.join(root, "CLAUDE.md"), "a".repeat(8000), "utf8");
 
   const result = scanRepo(root);
   const claude = result.instructionFiles.find((file) => file.path === "CLAUDE.md");
   applyFixes(result);
 
-  assert.equal(claude.tokens, 600);
-  assert.ok(result.issues.some((issue) => issue.title.includes("CLAUDE.md") && issue.estimatedTokenImpact.includes("100")));
+  assert.equal(claude.tokens, 2000);
+  assert.ok(result.issues.some((issue) => issue.title.includes("CLAUDE.md") && issue.estimatedTokenImpact.includes("1,200")));
   assert.ok(fs.existsSync(path.join(root, "prismo-optimized-CLAUDE.template.md")));
 });
 
@@ -97,6 +105,7 @@ test("writeReport generates markdown with Claude and Codex recommendations", () 
   assert.ok(report.includes("Executive Summary"));
   assert.ok(report.includes("Claude Code Findings"));
   assert.ok(report.includes("OpenAI/Codex Findings"));
+  assert.ok(report.includes("Recommended .cursorignore"));
   assert.ok(report.includes("Disclaimer"));
 });
 
@@ -152,7 +161,9 @@ test("demo command is safe for first-time users", () => {
   assert.equal(result.status, 0, result.stderr);
   assert.ok(result.stdout.includes("PrismoDev"));
   assert.ok(result.stdout.includes("Try it on your repo"));
-  assert.ok(result.stdout.includes("npx getprismo scan --usage"));
+  assert.ok(result.stdout.includes("npx getprismo doctor"));
+  assert.ok(result.stdout.includes("npx getprismo watch"));
+  assert.ok(result.stdout.includes("npx getprismo cc timeline"));
 });
 
 test("scan reports coding-agent readiness, optimization stack, tool-output risk, and proxy tracking", () => {
@@ -205,6 +216,7 @@ test("optimize generates AI-readable context files in .prismo", () => {
   assert.ok(fs.existsSync(path.join(root, ".prismo", "recommended-CLAUDE.md")));
   assert.ok(fs.existsSync(path.join(root, ".prismo", "recommended-AGENTS.md")));
   assert.ok(fs.existsSync(path.join(root, ".prismo", "recommended-.claudeignore")));
+  assert.ok(fs.existsSync(path.join(root, ".prismo", "recommended-.cursorignore")));
   assert.ok(fs.existsSync(path.join(root, ".prismo", "recommended-.gitignore-additions")));
   assert.ok(fs.existsSync(path.join(root, ".prismo", "optimize-report.md")));
 });
@@ -405,6 +417,18 @@ test("cc command reports Claude Code token costs and cache savings", () => {
   assert.ok(terminal.stdout.includes("Cache saved you"));
   assert.ok(terminal.stdout.includes("Prismo Diagnosis"));
   assert.ok(terminal.stdout.includes("Better Next Actions"));
+
+  const timeline = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "cc", "timeline", "--json", root],
+    { encoding: "utf8", env }
+  );
+  assert.equal(timeline.status, 0, timeline.stderr);
+  const timelinePayload = JSON.parse(timeline.stdout);
+  assert.equal(timelinePayload.schemaVersion, 1);
+  assert.equal(timelinePayload.command, "cc timeline");
+  assert.equal(timelinePayload.session.model, "claude-sonnet-4-20250514");
+  assert.ok(Array.isArray(timelinePayload.timeline));
 });
 
 test("usage terminal output and watch --once --json are script-friendly", () => {
@@ -422,7 +446,7 @@ test("usage terminal output and watch --once --json are script-friendly", () => 
     JSON.stringify({
       type: "event_msg",
       timestamp: "2026-05-08T10:02:00Z",
-      payload: { type: "tool_result", content: "failure\n".repeat(30000) },
+      payload: { type: "tool_result", content: (`failure in package-lock.json and dist/app.js after npm test\n`).repeat(30000) },
     }),
     JSON.stringify({
       type: "event_msg",
@@ -462,8 +486,10 @@ test("usage terminal output and watch --once --json are script-friendly", () => 
   assert.equal(payload.sessions[0].displayTokens, 150);
   assert.ok(payload.live);
   assert.equal(payload.live.activeSession.tool, "codex");
+  assert.ok(["Medium", "High"].includes(payload.live.contextPressure));
   assert.ok(payload.live.warnings.some((warning) => warning.includes("Tool/output")));
-  assert.ok(payload.live.recommendedAction.includes("context"));
+  assert.ok(payload.live.warnings.some((warning) => warning.includes("package-lock.json")));
+  assert.ok(payload.live.recommendedAction.includes("doctor"));
 
   const watchTerminal = spawnSync(
     process.execPath,
@@ -471,10 +497,20 @@ test("usage terminal output and watch --once --json are script-friendly", () => 
     { encoding: "utf8", env }
   );
   assert.equal(watchTerminal.status, 0, watchTerminal.stderr);
-  assert.ok(watchTerminal.stdout.includes("Active Session"));
-  assert.ok(watchTerminal.stdout.includes("Live Warnings"));
-  assert.ok(watchTerminal.stdout.includes("Next Action"));
+  assert.ok(watchTerminal.stdout.includes("Context Pressure"));
+  assert.ok(watchTerminal.stdout.includes("Recent Growth"));
+  assert.ok(watchTerminal.stdout.includes("Warnings"));
+  assert.ok(watchTerminal.stdout.includes("Suggested Action"));
   assert.equal(watchTerminal.stdout.includes("Refreshing every"), false);
+
+  const watchReport = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "watch", "codex", "--once", "--report", "--limit", "1", root],
+    { encoding: "utf8", env }
+  );
+  assert.equal(watchReport.status, 0, watchReport.stderr);
+  assert.ok(fs.existsSync(path.join(root, ".prismo", "watch-report.md")));
+  assert.ok(fs.readFileSync(path.join(root, ".prismo", "watch-report.md"), "utf8").includes("Prismo Watch Report"));
 });
 
 test("scan --usage folds exact local session usage into diagnostics", () => {
@@ -587,6 +623,158 @@ test("dev command runs guided scan, optimize, and prompt flow", () => {
   assert.ok(payload.generatedFiles.includes(".prismo/architecture-summary.md"));
   assert.ok(payload.prompt.includes(".prismo/"));
   assert.equal(payload.realUsage.totals.displayTokens, 1200);
+});
+
+test("doctor command safely optimizes repo and reports before/after payoff", () => {
+  const root = tempRepo();
+  fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ dependencies: { next: "14.0.0", react: "18.0.0" } }), "utf8");
+  fs.mkdirSync(path.join(root, "src", "app"), { recursive: true });
+  fs.mkdirSync(path.join(root, "node_modules"), { recursive: true });
+  fs.writeFileSync(path.join(root, "src", "app", "page.tsx"), "export default function Page() { return null }\n", "utf8");
+  fs.writeFileSync(path.join(root, "CLAUDE.md"), "Use concise instructions.\n".repeat(300), "utf8");
+
+  const result = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "doctor", root],
+    { encoding: "utf8", env: { ...process.env, PRISMO_CODEX_HOME: path.join(root, "none"), PRISMO_CLAUDE_HOME: path.join(root, "none") } }
+  );
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.ok(result.stdout.includes("PrismoDev Doctor"));
+  assert.ok(result.stdout.includes("Before:"));
+  assert.ok(result.stdout.includes("After:"));
+  assert.ok(result.stdout.includes("Estimated exposed context reduction"));
+  assert.ok(result.stdout.includes("Recommended starting context"));
+  assert.ok(fs.existsSync(path.join(root, ".claudeignore")));
+  assert.ok(fs.existsSync(path.join(root, ".cursorignore")));
+  assert.ok(fs.existsSync(path.join(root, "prismo-dev-report.md")));
+  assert.ok(fs.existsSync(path.join(root, "prismo-optimized-CLAUDE.template.md")));
+  assert.ok(fs.existsSync(path.join(root, ".prismo", "architecture-summary.md")));
+  assert.ok(fs.existsSync(path.join(root, ".prismo", "frontend-context.md")));
+  assert.equal(fs.readFileSync(path.join(root, "CLAUDE.md"), "utf8").includes("Use concise instructions."), true);
+});
+
+test("doctor --json outputs valid before/after payload only", () => {
+  const root = tempRepo();
+  fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ dependencies: { express: "4.0.0" } }), "utf8");
+  fs.mkdirSync(path.join(root, "dist"), { recursive: true });
+
+  const result = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "doctor", "--json", root],
+    { encoding: "utf8", env: { ...process.env, PRISMO_CODEX_HOME: path.join(root, "none"), PRISMO_CLAUDE_HOME: path.join(root, "none") } }
+  );
+
+  assert.equal(result.status, 0, result.stderr);
+  const payload = JSON.parse(result.stdout);
+  assert.equal(payload.scannedPath, root);
+  assert.equal(typeof payload.before.score, "number");
+  assert.equal(typeof payload.after.score, "number");
+  assert.equal(typeof payload.scoreDelta, "number");
+  assert.ok(Array.isArray(payload.fixActions));
+  assert.ok(payload.generatedFiles.includes(".prismo/architecture-summary.md"));
+  assert.ok(payload.contextCommand.includes("npx getprismo context"));
+  assert.equal(result.stdout.trim().startsWith("{"), true);
+});
+
+test("doctor --dry-run does not write optimization files", () => {
+  const root = tempRepo();
+  fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ dependencies: { react: "18.0.0" } }), "utf8");
+  fs.mkdirSync(path.join(root, "dist"), { recursive: true });
+
+  const result = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "doctor", "--dry-run", root],
+    { encoding: "utf8", env: { ...process.env, PRISMO_CODEX_HOME: path.join(root, "none"), PRISMO_CLAUDE_HOME: path.join(root, "none") } }
+  );
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.ok(result.stdout.includes("Mode: dry run"));
+  assert.ok(result.stdout.includes("Would Fix"));
+  assert.equal(fs.existsSync(path.join(root, ".claudeignore")), false);
+  assert.equal(fs.existsSync(path.join(root, ".prismo", "architecture-summary.md")), false);
+});
+
+test("doctor supports ignores-only and no-context-pack polish flags", () => {
+  const root = tempRepo();
+  fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ dependencies: { react: "18.0.0" } }), "utf8");
+  fs.mkdirSync(path.join(root, "dist"), { recursive: true });
+
+  const ignoresOnly = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "doctor", "--apply-ignores-only", root],
+    { encoding: "utf8", env: { ...process.env, PRISMO_CODEX_HOME: path.join(root, "none"), PRISMO_CLAUDE_HOME: path.join(root, "none") } }
+  );
+
+  assert.equal(ignoresOnly.status, 0, ignoresOnly.stderr);
+  assert.ok(fs.existsSync(path.join(root, ".claudeignore")));
+  assert.ok(fs.existsSync(path.join(root, ".cursorignore")));
+  assert.equal(fs.existsSync(path.join(root, "prismo-dev-report.md")), false);
+  assert.equal(fs.existsSync(path.join(root, ".prismo", "architecture-summary.md")), false);
+  assert.ok(ignoresOnly.stdout.includes("Context pack generation skipped"));
+
+  const noContextRoot = tempRepo();
+  fs.writeFileSync(path.join(noContextRoot, "package.json"), JSON.stringify({ dependencies: { react: "18.0.0" } }), "utf8");
+  const noContext = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "doctor", "--no-context-packs", "--json", noContextRoot],
+    { encoding: "utf8", env: { ...process.env, PRISMO_CODEX_HOME: path.join(noContextRoot, "none"), PRISMO_CLAUDE_HOME: path.join(noContextRoot, "none") } }
+  );
+  assert.equal(noContext.status, 0, noContext.stderr);
+  const payload = JSON.parse(noContext.stdout);
+  assert.equal(payload.schemaVersion, 1);
+  assert.equal(payload.noContextPacks, true);
+  assert.deepEqual(payload.generatedFiles, []);
+});
+
+test("optimize accepts arbitrary scope names for context packs", () => {
+  const root = tempRepo();
+  fs.mkdirSync(path.join(root, "backend", "app", "modules", "billing"), { recursive: true });
+  fs.writeFileSync(path.join(root, "backend", "app", "modules", "billing", "router.py"), "def billing(): pass\n", "utf8");
+
+  const result = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "optimize", "billing", root],
+    { encoding: "utf8" }
+  );
+
+  assert.equal(result.status, 0, result.stderr);
+  const contextPath = path.join(root, ".prismo", "billing-context.md");
+  assert.ok(fs.existsSync(contextPath));
+  assert.ok(fs.readFileSync(contextPath, "utf8").includes("billing/router.py"));
+});
+
+test("scan --ci fails high-risk repos", () => {
+  const root = tempRepo();
+  fs.mkdirSync(path.join(root, "node_modules"), { recursive: true });
+  fs.writeFileSync(path.join(root, "large.json"), `{ "data": "${"x".repeat(700 * 1024)}" }`, "utf8");
+
+  const result = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "scan", "--ci", "--no-report", root],
+    { encoding: "utf8" }
+  );
+
+  assert.notEqual(result.status, 0);
+  assert.ok(result.stdout.includes("Prismo CI"));
+  assert.ok(result.stdout.includes("FAIL"));
+});
+
+test("init dry-run previews npm scripts without modifying package.json", () => {
+  const root = tempRepo();
+  fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ scripts: {} }, null, 2), "utf8");
+
+  const result = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "init", "--dry-run", root],
+    { encoding: "utf8" }
+  );
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.ok(result.stdout.includes("Mode: dry run"));
+  assert.ok(result.stdout.includes("Would add npm scripts"));
+  assert.equal(fs.existsSync(path.join(root, ".prismo", "README.md")), false);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8")).scripts["ai:doctor"], undefined);
 });
 
 test("missing scan path returns a clear error", () => {

@@ -1,6 +1,16 @@
-PrismoDev
+Prismo
 Copyright 2026 Prismo
 
-PrismoDev is the open-source local CLI scanner for AI coding workflow token
-waste. The hosted Prismo app, managed proxy, dashboard, billing, auth,
-provider vault, and team features are not included in this repository.
+This product includes code, algorithms, and implementation ideas adapted from
+vLLM Semantic Router.
+
+vLLM Semantic Router
+Source: https://github.com/vllm-project/semantic-router
+License: Apache License, Version 2.0
+Upstream commit checked: b8e23fb307bf508ae36958d3621445e10e709fe7
+
+Upstream copyright notices observed:
+Copyright 2025 vLLM Semantic Router.
+Copyright 2026 vLLM Semantic Router Contributors.
+
+No root upstream NOTICE file was present at the checked commit.
