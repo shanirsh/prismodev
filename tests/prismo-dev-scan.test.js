@@ -533,6 +533,21 @@ test("usage terminal output and watch --once --json are script-friendly", () => 
   const rescuePayload = JSON.parse(rescueJson.stdout);
   assert.ok(rescuePayload.rescuePrompt.includes("Prismo Rescue Prompt"));
 
+  const guardrails = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "watch", "codex", "--once", "--guardrails", "--json", "--limit", "1", root],
+    { encoding: "utf8", env }
+  );
+  assert.equal(guardrails.status, 0, guardrails.stderr);
+  const guardrailsPayload = JSON.parse(guardrails.stdout);
+  assert.equal(guardrailsPayload.guardrailsPath, ".prismo/live-guardrails.md");
+  assert.equal(guardrailsPayload.rescuePath, ".prismo/live-rescue-prompt.md");
+  const guardrailsText = fs.readFileSync(path.join(root, ".prismo", "live-guardrails.md"), "utf8");
+  const liveRescueText = fs.readFileSync(path.join(root, ".prismo", "live-rescue-prompt.md"), "utf8");
+  assert.ok(guardrailsText.includes("Prismo Live Guardrails"));
+  assert.ok(guardrailsText.includes("Effective Immediately"));
+  assert.ok(liveRescueText.includes("Prismo Rescue Prompt"));
+
   const watchReport = spawnSync(
     process.execPath,
     [path.join(__dirname, "..", "bin", "prismo.js"), "watch", "codex", "--once", "--report", "--limit", "1", root],

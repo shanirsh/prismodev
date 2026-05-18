@@ -136,6 +136,50 @@ watch caught lockfiles entering context, a file being read 286 times, and tool o
 
 ---
 
+## new: live guardrails mode
+
+if you want prismodev to keep updating instructions while the session runs, use:
+
+```bash
+npx getprismo watch --guardrails
+```
+
+this writes and continuously updates:
+
+```text
+.prismo/live-guardrails.md
+.prismo/live-rescue-prompt.md
+```
+
+the idea is simple: tell your coding agent once at the start of the session:
+
+```text
+follow .prismo/live-guardrails.md during this session.
+```
+
+then keep `watch --guardrails` running. when prismodev detects tool-output floods, artifact leaks, repeated reads, loops, or context spikes, it updates the guardrails file with the current issue and the exact behavior the agent should follow next.
+
+example guardrails:
+
+```md
+# Prismo Live Guardrails
+
+Context pressure: High
+Current issue: tool-output-flood
+Confidence: high
+
+## Effective Immediately
+
+- Stop loading full logs or broad command output.
+- Rerun failing commands with tight filters or short ranges.
+- Ask the agent to summarize current errors before reading more files.
+- Do not read generated artifacts, lockfiles, caches, build output, coverage, or logs unless explicitly required.
+```
+
+this does not secretly control claude code or codex internals. it gives the agent a live-updating instruction file to follow, which is the safest local-first way to reduce token waste without requiring an IDE extension or agent plugin.
+
+---
+
 ## new: live rescue mode
 
 when `watch` detects a session going sideways, run:
@@ -198,6 +242,8 @@ live action causes include:
 - `high-context-pressure`
 
 this is the proactive part of prismodev: it does not just tell you something is expensive. it tells you what to do **right now** while the session is still recoverable.
+
+use `--guardrails` when you want files to update automatically during the session. use `--rescue` when you want a one-shot prompt to paste immediately.
 
 ---
 
@@ -364,6 +410,8 @@ npx getprismo watch                      # live refresh
 npx getprismo watch --once               # single snapshot
 npx getprismo watch --once --report      # write .prismo/watch-report.md
 npx getprismo watch --once --json        # machine-readable
+npx getprismo watch --guardrails         # update .prismo/live-guardrails.md continuously
+npx getprismo watch --guardrails --json  # include guardrailsPath and rescuePath
 npx getprismo watch --rescue             # paste-ready live-session rescue prompt
 npx getprismo watch --rescue --json      # include rescuePrompt in JSON
 npx getprismo watch --once --redact-paths # hide local paths
