@@ -298,6 +298,8 @@ test("usage command reads exact Codex token_count events from local JSONL", () =
   const codexHome = tempRepo();
   const sessionDir = path.join(codexHome, "sessions", "2026", "05", "08");
   fs.mkdirSync(sessionDir, { recursive: true });
+  fs.mkdirSync(path.join(root, "src"), { recursive: true });
+  fs.writeFileSync(path.join(root, "src", "real.js"), "export const real = true;\n", "utf8");
   fs.writeFileSync(path.join(sessionDir, "rollout-test.jsonl"), [
     JSON.stringify({ type: "event_msg", timestamp: "2026-05-08T10:00:00Z", payload: { type: "session_meta", id: "codex-test", cwd: root, model: "gpt-test" } }),
     JSON.stringify({ type: "event_msg", timestamp: "2026-05-08T10:01:00Z", payload: { type: "token_count", info: { total_token_usage: { input_tokens: 1000, cached_input_tokens: 200, output_tokens: 300, total_tokens: 1500 } } } }),
@@ -448,7 +450,7 @@ test("usage terminal output and watch --once --json are script-friendly", () => 
     JSON.stringify({
       type: "event_msg",
       timestamp: "2026-05-08T10:02:00Z",
-      payload: { type: "tool_result", content: (`failure in package-lock.json and dist/app.js after npm test\n`).repeat(30000) },
+      payload: { type: "tool_result", content: (`failure in package-lock.json and dist/app.js after npm test\nsrc/real.js stayed relevant\n/Users/someone/other-repo/lib/noise.js should not count\nM /Users/someone/other-repo/lib/status-noise.js should not count\nmissing/local-file.js should not count\n`).repeat(30000) },
     }),
     JSON.stringify({
       type: "event_msg",
@@ -494,6 +496,8 @@ test("usage terminal output and watch --once --json are script-friendly", () => 
   assert.equal(payload.live.liveAction.cause, "tool-output-flood");
   assert.ok(payload.live.liveAction.now.length >= 2);
   assert.ok(payload.live.liveAction.rescueCommand.includes("watch --rescue"));
+  assert.equal(payload.live.activeSession.actionableRepeatedPaths.some((item) => item.value.includes("other-repo")), false);
+  assert.equal(payload.live.activeSession.actionableRepeatedPaths.some((item) => item.value.includes("missing/local-file.js")), false);
   assert.ok(payload.live.recommendedAction.includes("doctor"));
 
   const watchTerminal = spawnSync(
