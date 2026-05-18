@@ -247,6 +247,39 @@ use `--guardrails` when you want files to update automatically during the sessio
 
 ---
 
+## new: live context throttle
+
+if you want prismodev to enforce a session budget while you work, run:
+
+```bash
+npx getprismo watch --throttle --budget 600k
+```
+
+this writes:
+
+```text
+.prismo/live-context-throttle.md
+```
+
+when the active session gets near or crosses the budget, watch turns that into a live action:
+
+```text
+Cause: token-budget-exceeded
+Stop broad exploration.
+Summarize current state before more file reads.
+Start a fresh scoped session at the next task boundary.
+```
+
+use it with guardrails for the most proactive setup:
+
+```bash
+npx getprismo watch --guardrails --throttle --budget 600k
+```
+
+that gives the agent a live instruction file, a rescue prompt, and a stricter context throttle file that updates as the session changes.
+
+---
+
 ## real output: cc timeline
 
 run `npx getprismo cc timeline` after a session to understand what happened:
@@ -412,6 +445,7 @@ npx getprismo watch --once --report      # write .prismo/watch-report.md
 npx getprismo watch --once --json        # machine-readable
 npx getprismo watch --guardrails         # update .prismo/live-guardrails.md continuously
 npx getprismo watch --guardrails --json  # include guardrailsPath and rescuePath
+npx getprismo watch --throttle --budget 600k # enforce a live context budget
 npx getprismo watch --rescue             # paste-ready live-session rescue prompt
 npx getprismo watch --rescue --json      # include rescuePrompt in JSON
 npx getprismo watch --once --redact-paths # hide local paths
