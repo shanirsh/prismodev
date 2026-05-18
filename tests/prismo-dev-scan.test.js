@@ -293,6 +293,31 @@ test("context --json outputs prompt metadata", () => {
   assert.equal(result.stdout.trim().startsWith("{"), true);
 });
 
+test("firewall generates scoped context policy files", () => {
+  const root = tempRepo();
+  fs.mkdirSync(path.join(root, "backend", "app", "auth"), { recursive: true });
+  fs.mkdirSync(path.join(root, "backend", "app", "routes"), { recursive: true });
+  fs.mkdirSync(path.join(root, "coverage"), { recursive: true });
+  fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ dependencies: { express: "4.0.0" } }), "utf8");
+  fs.writeFileSync(path.join(root, "backend", "app", "auth", "security.py"), "def auth(): pass\n", "utf8");
+  fs.writeFileSync(path.join(root, "backend", "app", "routes", "users.py"), "def route(): pass\n", "utf8");
+
+  const result = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "firewall", "auth-bug", "--json", root],
+    { encoding: "utf8" }
+  );
+
+  assert.equal(result.status, 0, result.stderr);
+  const payload = JSON.parse(result.stdout);
+  assert.equal(payload.scope, "auth");
+  assert.ok(payload.allowed.some((item) => item.includes("auth")));
+  assert.ok(payload.blocked.includes("node_modules/**"));
+  assert.ok(payload.generatedFiles.includes(".prismo/context-firewall.md"));
+  assert.ok(fs.existsSync(path.join(root, ".prismo", "context-firewall.md")));
+  assert.ok(fs.readFileSync(path.join(root, ".prismo", "firewall-prompt.md"), "utf8").includes("Follow .prismo/context-firewall.md"));
+});
+
 test("usage command reads exact Codex token_count events from local JSONL", () => {
   const root = tempRepo();
   const codexHome = tempRepo();
@@ -580,6 +605,19 @@ test("usage terminal output and watch --once --json are script-friendly", () => 
   const watchEvent = JSON.parse(fs.readFileSync(eventsPath, "utf8").trim().split(/\r?\n/)[0]);
   assert.equal(watchEvent.schemaVersion, 1);
   assert.equal(watchEvent.cause, autoPayload.live.liveAction.cause);
+  assert.equal(autoPayload.firewallPath, ".prismo/context-firewall.md");
+  assert.ok(fs.existsSync(path.join(root, ".prismo", "context-firewall.md")));
+
+  fs.rmSync(path.join(root, ".prismo", "watch-events.jsonl"));
+  const noEvents = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "watch", "codex", "--once", "--auto", "--no-events", "--json", "--limit", "1", root],
+    { encoding: "utf8", env }
+  );
+  assert.equal(noEvents.status, 0, noEvents.stderr);
+  const noEventsPayload = JSON.parse(noEvents.stdout);
+  assert.equal(noEventsPayload.eventsPath, null);
+  assert.equal(fs.existsSync(path.join(root, ".prismo", "watch-events.jsonl")), false);
 
   const watchReport = spawnSync(
     process.execPath,

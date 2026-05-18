@@ -295,6 +295,51 @@ that gives the agent a live instruction file, a rescue prompt, and a stricter co
 
 `watch --auto` also appends changed live warnings to `.prismo/watch-events.jsonl`, so expensive-session events can be reused later in postmortems.
 
+Use `--no-events` when you want live protection without writing session event history:
+
+```bash
+npx getprismo watch --auto --no-events
+```
+
+---
+
+## new: context firewall
+
+generate a scoped context policy before a task:
+
+```bash
+npx getprismo firewall auth-bug
+```
+
+this writes:
+
+```text
+.prismo/context-firewall.md
+.prismo/allowed-context.txt
+.prismo/blocked-context.txt
+.prismo/firewall-prompt.md
+```
+
+the firewall tells the agent what it should read first and what it should avoid unless it explains why. this is the prevention layer: instead of only warning after context bloat happens, prismodev gives the agent a smaller context boundary up front.
+
+example:
+
+```text
+Allowed first:
+- .prismo/architecture-summary.md
+- .prismo/backend-summary.md
+- backend/app/*/auth/*
+
+Blocked unless justified:
+- node_modules/**
+- .next/**
+- dist/**
+- coverage/**
+- package-lock.json
+```
+
+`watch --auto` also updates `.prismo/context-firewall.md` when it detects live waste, so the active session gets a tighter context policy as pressure rises.
+
 ---
 
 ## real output: cc timeline
@@ -444,6 +489,7 @@ no install needed. npx runs it directly.
 
 ```bash
 npx getprismo doctor                     # full run
+npx getprismo firewall auth-bug          # generate scoped context firewall
 npx getprismo doctor --dry-run           # preview without writing files
 npx getprismo doctor --apply-ignores-only # only create ignore files
 npx getprismo doctor --no-context-packs  # skip .prismo/ generation
@@ -461,6 +507,7 @@ npx getprismo watch --once               # single snapshot
 npx getprismo watch --once --report      # write .prismo/watch-report.md
 npx getprismo watch --once --json        # machine-readable
 npx getprismo watch --auto               # guardrails + throttle + 600k budget
+npx getprismo watch --auto --no-events   # live protection without event history
 npx getprismo watch --guardrails         # update .prismo/live-guardrails.md continuously
 npx getprismo watch --guardrails --json  # include guardrailsPath and rescuePath
 npx getprismo watch --throttle --budget 600k # enforce a live context budget
