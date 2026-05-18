@@ -144,12 +144,13 @@ the easiest proactive mode is:
 npx getprismo watch --auto
 ```
 
-`--auto` turns on live guardrails, live context throttling, and a default 600k session budget. it writes:
+`--auto` turns on live guardrails, live context throttling, event logging, and a default 600k session budget. it writes:
 
 ```text
 .prismo/live-guardrails.md
 .prismo/live-context-throttle.md
 .prismo/live-rescue-prompt.md
+.prismo/watch-events.jsonl
 ```
 
 if you want prismodev to keep updating instructions while the session runs, use:
@@ -291,6 +292,8 @@ npx getprismo watch --auto
 ```
 
 that gives the agent a live instruction file, a rescue prompt, and a stricter context throttle file that updates as the session changes.
+
+`watch --auto` also appends changed live warnings to `.prismo/watch-events.jsonl`, so expensive-session events can be reused later in postmortems.
 
 ---
 
@@ -461,6 +464,7 @@ npx getprismo watch --auto               # guardrails + throttle + 600k budget
 npx getprismo watch --guardrails         # update .prismo/live-guardrails.md continuously
 npx getprismo watch --guardrails --json  # include guardrailsPath and rescuePath
 npx getprismo watch --throttle --budget 600k # enforce a live context budget
+npx getprismo watch --events             # append changed warnings to .prismo/watch-events.jsonl
 npx getprismo watch --rescue             # paste-ready live-session rescue prompt
 npx getprismo watch --rescue --json      # include rescuePrompt in JSON
 npx getprismo watch --once --redact-paths # hide local paths

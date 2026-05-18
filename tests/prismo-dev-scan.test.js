@@ -573,7 +573,13 @@ test("usage terminal output and watch --once --json are script-friendly", () => 
   assert.equal(autoPayload.guardrailsPath, ".prismo/live-guardrails.md");
   assert.equal(autoPayload.rescuePath, ".prismo/live-rescue-prompt.md");
   assert.equal(autoPayload.throttlePath, ".prismo/live-context-throttle.md");
+  assert.equal(autoPayload.eventsPath, ".prismo/watch-events.jsonl");
   assert.equal(autoPayload.live.budget.budget, 600000);
+  const eventsPath = path.join(root, ".prismo", "watch-events.jsonl");
+  assert.ok(fs.existsSync(eventsPath));
+  const watchEvent = JSON.parse(fs.readFileSync(eventsPath, "utf8").trim().split(/\r?\n/)[0]);
+  assert.equal(watchEvent.schemaVersion, 1);
+  assert.equal(watchEvent.cause, autoPayload.live.liveAction.cause);
 
   const watchReport = spawnSync(
     process.execPath,
@@ -717,6 +723,9 @@ test("doctor command safely optimizes repo and reports before/after payoff", () 
   assert.ok(result.stdout.includes("After:"));
   assert.ok(result.stdout.includes("Estimated exposed context reduction"));
   assert.ok(result.stdout.includes("Recommended starting context"));
+  assert.ok(result.stdout.includes("Next live session:"));
+  assert.ok(result.stdout.includes("npx getprismo watch --auto"));
+  assert.ok(result.stdout.includes("Follow .prismo/live-guardrails.md"));
   assert.ok(fs.existsSync(path.join(root, ".claudeignore")));
   assert.ok(fs.existsSync(path.join(root, ".cursorignore")));
   assert.ok(fs.existsSync(path.join(root, "prismo-dev-report.md")));
