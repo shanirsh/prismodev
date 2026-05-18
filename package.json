@@ -2,7 +2,24 @@
   "name": "getprismo",
   "version": "0.1.5",
   "description": "Local AI coding workflow scanner for Codex, Claude Code, Cursor, and token-waste diagnostics.",
-  "license": "UNLICENSED",
+  "license": "MIT",
+  "homepage": "https://github.com/shanirsh/prismodev#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shanirsh/prismodev.git"
+  },
+  "bugs": {
+    "url": "https://github.com/shanirsh/prismodev/issues"
+  },
+  "keywords": [
+    "ai",
+    "codex",
+    "claude-code",
+    "cursor",
+    "developer-tools",
+    "llm",
+    "token-optimization"
+  ],
   "publishConfig": {
     "access": "public"
   },
@@ -13,17 +30,17 @@
     "bin/",
     "lib/",
     "docs/prismodev-user-testing.md",
-    "README.md"
+    "README.md",
+    "LICENSE",
+    "NOTICE"
   ],
   "engines": {
     "node": ">=18"
   },
   "scripts": {
-    "dev": "./dev.sh",
-    "dev:backend": "./dev.sh backend",
-    "dev:frontend": "./dev.sh frontend",
-    "demo:yc": "python3 scripts/yc_demo_prismo.py",
+    "demo": "node bin/prismo.js demo",
     "scan": "node bin/prismo.js scan",
+    "test": "node --test tests/prismo-dev-scan.test.js",
     "test:scan": "node --test tests/prismo-dev-scan.test.js"
   }
 }

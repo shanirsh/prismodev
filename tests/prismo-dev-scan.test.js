@@ -76,6 +76,8 @@ test("CLAUDE.md token estimate produces deterministic impact text and template",
 
   assert.equal(claude.tokens, 2000);
   assert.ok(result.issues.some((issue) => issue.title.includes("CLAUDE.md") && issue.estimatedTokenImpact.includes("1,200")));
+  assert.ok(result.issues.some((issue) => issue.title.includes("CLAUDE.md") && issue.estimatedTokenImpact.includes("~$0.14/session")));
+  assert.ok(result.issues.some((issue) => issue.title.includes("CLAUDE.md") && issue.estimatedTokenImpact.includes("$4.32/month")));
   assert.ok(fs.existsSync(path.join(root, "prismo-optimized-CLAUDE.template.md")));
 });
 
