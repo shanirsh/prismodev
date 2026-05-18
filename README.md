@@ -136,6 +136,71 @@ watch caught lockfiles entering context, a file being read 286 times, and tool o
 
 ---
 
+## new: live rescue mode
+
+when `watch` detects a session going sideways, run:
+
+```bash
+npx getprismo watch --rescue
+```
+
+it prints a paste-ready rescue prompt for the current ai coding session:
+
+```text
+Prismo Rescue Prompt
+
+Paste this into the current AI coding session:
+
+We are in a high-context AI coding session. Stop broad exploration and recover state before doing more work.
+
+Current Prismo signal: tool-output-flood (high confidence).
+Summary: Tool/output tokens are dominating this session (264k tokens).
+Context pressure: High. Session size: 1.11M tokens. Tool output: 264k tokens.
+
+Do this now:
+1. Stop loading full logs or broad command output.
+2. Rerun failing commands with tight filters or short ranges.
+3. Ask the agent to summarize current errors before reading more files.
+
+Before reading or editing anything else, summarize:
+- files changed so far
+- exact failing command or error
+- current hypothesis
+- next smallest file/test to inspect
+
+Do not re-read these files unless they changed.
+Do not read generated/noisy artifacts unless explicitly required.
+```
+
+`watch --rescue --json` includes the same prompt as `rescuePrompt`, plus the structured live action:
+
+```json
+{
+  "live": {
+    "contextPressure": "High",
+    "liveAction": {
+      "cause": "tool-output-flood",
+      "confidence": "high",
+      "summary": "Tool/output tokens are dominating this session.",
+      "rescueAvailable": true
+    }
+  }
+}
+```
+
+live action causes include:
+
+- `tool-output-flood`
+- `artifact-leak`
+- `possible-loop`
+- `repeated-file-read`
+- `context-spike`
+- `high-context-pressure`
+
+this is the proactive part of prismodev: it does not just tell you something is expensive. it tells you what to do **right now** while the session is still recoverable.
+
+---
+
 ## real output: cc timeline
 
 run `npx getprismo cc timeline` after a session to understand what happened:
@@ -220,6 +285,15 @@ npx getprismo watch --rescue
 ```
 
 the rescue prompt tells the agent to stop broad exploration, summarize changed files and current failures, avoid noisy artifacts, and continue from the next smallest useful file/test.
+
+watch is tuned for large repos:
+
+- ignores absolute paths outside the target repo
+- keeps generated artifacts out of repeated-source-file actions
+- groups lockfiles, `__pycache__`, `node_modules`, and hashed build assets separately
+- only treats repeated non-generated files as actionable when they exist inside the target repo
+
+this keeps large-repo output focused on real source context instead of path noise from old logs or unrelated projects.
 
 ---
 
