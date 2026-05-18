@@ -114,6 +114,14 @@ Warnings
 - node bin/prismo.js appears repeatedly in context (85x).
 - lockfiles likely entered active context (60 mentions).
 
+Do This Now
+Cause: tool-output-flood (high confidence)
+Tool/output tokens are dominating this session (237k tokens).
+1. Stop loading full logs or broad command output.
+2. Rerun failing commands with tight filters or short ranges.
+3. Ask the agent to summarize current errors before reading more files.
+Rescue: npx getprismo watch --rescue
+
 Signals
 - Repeated file: lib/prismo-dev-scan.js (286x)
 - Repeated file: node bin/prismo.js (85x)
@@ -205,6 +213,14 @@ watch reads local session logs from codex and claude code. it detects:
 
 watch tells you the single most useful action to take right now. usually: start a fresh session, or switch to a scoped context pack.
 
+`watch --rescue` prints a paste-ready prompt for the active coding session. use it when the agent is looping, reading too many files, or flooding context with logs:
+
+```bash
+npx getprismo watch --rescue
+```
+
+the rescue prompt tells the agent to stop broad exploration, summarize changed files and current failures, avoid noisy artifacts, and continue from the next smallest useful file/test.
+
 ---
 
 ## quick start
@@ -274,6 +290,8 @@ npx getprismo watch                      # live refresh
 npx getprismo watch --once               # single snapshot
 npx getprismo watch --once --report      # write .prismo/watch-report.md
 npx getprismo watch --once --json        # machine-readable
+npx getprismo watch --rescue             # paste-ready live-session rescue prompt
+npx getprismo watch --rescue --json      # include rescuePrompt in JSON
 npx getprismo watch --once --redact-paths # hide local paths
 npx getprismo watch codex                # only codex sessions
 npx getprismo watch claude               # only claude code sessions

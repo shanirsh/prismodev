@@ -491,6 +491,9 @@ test("usage terminal output and watch --once --json are script-friendly", () => 
   assert.ok(["Medium", "High"].includes(payload.live.contextPressure));
   assert.ok(payload.live.warnings.some((warning) => warning.includes("Tool/output")));
   assert.ok(payload.live.warnings.some((warning) => warning.includes("package-lock.json")));
+  assert.equal(payload.live.liveAction.cause, "tool-output-flood");
+  assert.ok(payload.live.liveAction.now.length >= 2);
+  assert.ok(payload.live.liveAction.rescueCommand.includes("watch --rescue"));
   assert.ok(payload.live.recommendedAction.includes("doctor"));
 
   const watchTerminal = spawnSync(
@@ -502,8 +505,29 @@ test("usage terminal output and watch --once --json are script-friendly", () => 
   assert.ok(watchTerminal.stdout.includes("Context Pressure"));
   assert.ok(watchTerminal.stdout.includes("Recent Growth"));
   assert.ok(watchTerminal.stdout.includes("Warnings"));
+  assert.ok(watchTerminal.stdout.includes("Do This Now"));
+  assert.ok(watchTerminal.stdout.includes("Cause:"));
   assert.ok(watchTerminal.stdout.includes("Suggested Action"));
   assert.equal(watchTerminal.stdout.includes("Refreshing every"), false);
+
+  const rescue = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "watch", "codex", "--once", "--rescue", "--limit", "1", root],
+    { encoding: "utf8", env }
+  );
+  assert.equal(rescue.status, 0, rescue.stderr);
+  assert.ok(rescue.stdout.includes("Prismo Rescue Prompt"));
+  assert.ok(rescue.stdout.includes("Paste this into the current AI coding session"));
+  assert.ok(rescue.stdout.includes("package-lock.json"));
+
+  const rescueJson = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "watch", "codex", "--once", "--rescue", "--json", "--limit", "1", root],
+    { encoding: "utf8", env }
+  );
+  assert.equal(rescueJson.status, 0, rescueJson.stderr);
+  const rescuePayload = JSON.parse(rescueJson.stdout);
+  assert.ok(rescuePayload.rescuePrompt.includes("Prismo Rescue Prompt"));
 
   const watchReport = spawnSync(
     process.execPath,
