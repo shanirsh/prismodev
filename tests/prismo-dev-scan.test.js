@@ -562,6 +562,19 @@ test("usage terminal output and watch --once --json are script-friendly", () => 
   assert.ok(throttleText.includes("Prismo Live Context Throttle"));
   assert.ok(throttleText.includes("hard-throttle"));
 
+  const auto = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "watch", "codex", "--once", "--auto", "--json", "--limit", "1", root],
+    { encoding: "utf8", env }
+  );
+  assert.equal(auto.status, 0, auto.stderr);
+  const autoPayload = JSON.parse(auto.stdout);
+  assert.equal(autoPayload.auto, true);
+  assert.equal(autoPayload.guardrailsPath, ".prismo/live-guardrails.md");
+  assert.equal(autoPayload.rescuePath, ".prismo/live-rescue-prompt.md");
+  assert.equal(autoPayload.throttlePath, ".prismo/live-context-throttle.md");
+  assert.equal(autoPayload.live.budget.budget, 600000);
+
   const watchReport = spawnSync(
     process.execPath,
     [path.join(__dirname, "..", "bin", "prismo.js"), "watch", "codex", "--once", "--report", "--limit", "1", root],
