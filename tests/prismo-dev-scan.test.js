@@ -32,7 +32,8 @@ test("flags oversized CLAUDE.md, missing .claudeignore, bloat dirs, and large fi
 test("fix mode creates .claudeignore and report without overwriting existing report silently", () => {
   const root = tempRepo();
   fs.writeFileSync(path.join(root, "AGENTS.md"), "Keep changes small.\n", "utf8");
-  fs.writeFileSync(path.join(root, "prismo-dev-report.md"), "old report", "utf8");
+  fs.mkdirSync(path.join(root, ".prismo"), { recursive: true });
+  fs.writeFileSync(path.join(root, ".prismo", "prismo-dev-report.md"), "old report", "utf8");
 
   const result = scanRepo(root);
   const actions = applyFixes(result);
@@ -42,9 +43,9 @@ test("fix mode creates .claudeignore and report without overwriting existing rep
   assert.ok(fs.readFileSync(path.join(root, ".claudeignore"), "utf8").includes("node_modules/"));
   assert.ok(fs.readFileSync(path.join(root, ".cursorignore"), "utf8").includes("node_modules/"));
   assert.ok(fs.readFileSync(path.join(root, ".cursorignore"), "utf8").includes(".prismo/"));
-  assert.ok(fs.readFileSync(path.join(root, "prismo-dev-report.md"), "utf8").includes("PrismoDev Report"));
+  assert.ok(fs.readFileSync(path.join(root, ".prismo", "prismo-dev-report.md"), "utf8").includes("PrismoDev Report"));
   assert.ok(actions.some((action) => action.includes("Backed up existing report")));
-  assert.ok(fs.readdirSync(root).some((name) => name.startsWith("prismo-dev-report.md.") && name.endsWith(".bak")));
+  assert.ok(fs.readdirSync(path.join(root, ".prismo")).some((name) => name.startsWith("prismo-dev-report.md.") && name.endsWith(".bak")));
 });
 
 test("existing .claudeignore creates .claudeignore.prismo-suggested instead of overwriting", () => {
@@ -93,7 +94,7 @@ test("AGENTS.md and .codex config are detected as Codex findings", () => {
   assert.ok(result.instructionFiles.some((file) => file.path === "AGENTS.md"));
   assert.ok(result.codexConfig.files.some((file) => file.includes(".codex/config.toml")));
   assert.ok(result.issues.some((issue) => issue.category === "codex_config"));
-  assert.ok(fs.existsSync(path.join(root, "prismo-AGENTS-recommendations.md")));
+  assert.ok(fs.existsSync(path.join(root, ".prismo", "prismo-AGENTS-recommendations.md")));
 });
 
 test("writeReport generates markdown with Claude and Codex recommendations", () => {
@@ -150,7 +151,7 @@ test("scan --simple prints plain-English output and does not write a report", ()
   assert.ok(result.stdout.includes("PrismoDev Simple Scan"));
   assert.ok(result.stdout.includes("Plain English:"));
   assert.ok(result.stdout.includes("does not need API keys"));
-  assert.equal(fs.existsSync(path.join(root, "prismo-dev-report.md")), false);
+  assert.equal(fs.existsSync(path.join(root, ".prismo", "prismo-dev-report.md")), false);
 });
 
 test("demo command is safe for first-time users", () => {
@@ -766,7 +767,7 @@ test("doctor command safely optimizes repo and reports before/after payoff", () 
   assert.ok(result.stdout.includes("Follow .prismo/live-guardrails.md"));
   assert.ok(fs.existsSync(path.join(root, ".claudeignore")));
   assert.ok(fs.existsSync(path.join(root, ".cursorignore")));
-  assert.ok(fs.existsSync(path.join(root, "prismo-dev-report.md")));
+  assert.ok(fs.existsSync(path.join(root, ".prismo", "prismo-dev-report.md")));
   assert.ok(fs.existsSync(path.join(root, "prismo-optimized-CLAUDE.template.md")));
   assert.ok(fs.existsSync(path.join(root, ".prismo", "architecture-summary.md")));
   assert.ok(fs.existsSync(path.join(root, ".prismo", "frontend-context.md")));
@@ -828,7 +829,7 @@ test("doctor supports ignores-only and no-context-pack polish flags", () => {
   assert.equal(ignoresOnly.status, 0, ignoresOnly.stderr);
   assert.ok(fs.existsSync(path.join(root, ".claudeignore")));
   assert.ok(fs.existsSync(path.join(root, ".cursorignore")));
-  assert.equal(fs.existsSync(path.join(root, "prismo-dev-report.md")), false);
+  assert.equal(fs.existsSync(path.join(root, ".prismo", "prismo-dev-report.md")), false);
   assert.equal(fs.existsSync(path.join(root, ".prismo", "architecture-summary.md")), false);
   assert.ok(ignoresOnly.stdout.includes("Context pack generation skipped"));
 
