@@ -67,6 +67,64 @@ test("existing .claudeignore creates .claudeignore.prismo-suggested instead of o
   assert.ok(actions.some((action) => action.includes(".cursorignore.prismo-suggested")));
 });
 
+test("superset ignores skip suggested files and state/secrets are recommended", () => {
+  const root = tempRepo();
+  fs.writeFileSync(path.join(root, ".claudeignore"), [
+    "node_modules/",
+    ".next/",
+    "dist/",
+    "build/",
+    "coverage/",
+    ".turbo/",
+    ".venv/",
+    "venv/",
+    "__pycache__/",
+    "pycache/",
+    ".pytest_cache/",
+    ".cache/",
+    "logs/",
+    "*.log",
+    "*.lock",
+    "*.tmp",
+    "*.min.js",
+    "*.min.css",
+    "coverage-final.json",
+    "package-lock.json",
+    "yarn.lock",
+    "pnpm-lock.yaml",
+    "test-results/",
+    "playwright-report/",
+    "models/",
+    "state-backups/",
+    "backups/",
+    "*.sqlite",
+    "*.sqlite3",
+    "*.db",
+    "*_state.json",
+    "*_tokens.json",
+    "*_export.json",
+    "*secret*.json",
+    "*credential*.json",
+    ".env",
+    ".env.*",
+  ].join("\n") + "\n", "utf8");
+  fs.writeFileSync(path.join(root, ".cursorignore"), `${fs.readFileSync(path.join(root, ".claudeignore"), "utf8")}.prismo/\nprismo-optimized-CLAUDE.template.md\n`, "utf8");
+  fs.writeFileSync(path.join(root, "heartbeat_state.json"), "{}", "utf8");
+  fs.writeFileSync(path.join(root, "whoop_tokens.json"), "{}", "utf8");
+  fs.writeFileSync(path.join(root, "data.sqlite"), "", "utf8");
+
+  const result = scanRepo(root);
+  assert.ok(result.recommendedClaudeIgnore.includes("*_state.json"));
+  assert.ok(result.recommendedClaudeIgnore.includes("*_tokens.json"));
+  assert.ok(result.recommendedClaudeIgnore.includes("*.sqlite"));
+  assert.equal(result.missingClaudeIgnoreSuggestions.length, 0);
+  assert.equal(result.missingCursorIgnoreSuggestions.length, 0);
+  const actions = applyFixes(result);
+  assert.equal(fs.existsSync(path.join(root, ".claudeignore.prismo-suggested")), false);
+  assert.equal(fs.existsSync(path.join(root, ".cursorignore.prismo-suggested")), false);
+  assert.ok(actions.some((action) => action.includes("already covers Prismo recommendations")));
+});
+
 test("CLAUDE.md token estimate produces deterministic impact text and template", () => {
   const root = tempRepo();
   fs.writeFileSync(path.join(root, "CLAUDE.md"), "a".repeat(8000), "utf8");
@@ -272,6 +330,7 @@ test("optimize detects flat FastAPI Python layouts and collapses noisy directori
   assert.ok(backend.includes("auth_middleware.py"));
   assert.ok(backend.includes("qdrant_store.py"));
   assert.ok(frontend.includes("frontend/src/App.tsx"));
+  assert.ok(backend.includes("reference signal"));
   assert.ok(architecture.includes("Detection Gaps"));
   assert.ok(report.includes("temp_pipecat/**/__pycache__/"));
   assert.equal((report.match(/__pycache__/g) || []).length < 5, true);

@@ -392,6 +392,10 @@ what doctor creates:
 prismo-dev-report.md                       full diagnostic report
 ```
 
+if an existing `.claudeignore` or `.cursorignore` already covers prismo's recommendations, doctor skips the suggested ignore file instead of creating redundant noise. the default recommendations include common project state, local db, export, credential, and token patterns such as `*_state.json`, `*_tokens.json`, `*_export.json`, `*.sqlite`, `models/`, and `state-backups/`.
+
+backend and frontend summaries include load-bearing candidates ranked by lightweight reference signals plus file size, not just directory listings.
+
 what doctor never touches:
 
 - your real `CLAUDE.md`
