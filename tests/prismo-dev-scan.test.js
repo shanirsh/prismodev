@@ -302,10 +302,10 @@ test("optimize scoped frontend command generates frontend-context.md", () => {
 
 test("optimize detects flat FastAPI Python layouts and collapses noisy directories", () => {
   const root = tempRepo();
-  fs.writeFileSync(path.join(root, "main.py"), "from fastapi import FastAPI\napp = FastAPI()\n", "utf8");
-  fs.writeFileSync(path.join(root, "chat_service.py"), "from fastapi import APIRouter\nrouter = APIRouter()\n", "utf8");
+  fs.writeFileSync(path.join(root, "main.py"), "from fastapi import FastAPI\nfrom chat_service import router\napp = FastAPI()\n", "utf8");
+  fs.writeFileSync(path.join(root, "chat_service.py"), "from fastapi import APIRouter\nfrom auth_middleware import require_user\nrouter = APIRouter()\n", "utf8");
   fs.writeFileSync(path.join(root, "memory_service.py"), "class MemoryService: pass\n", "utf8");
-  fs.writeFileSync(path.join(root, "auth_middleware.py"), "Authorization = 'header'\n", "utf8");
+  fs.writeFileSync(path.join(root, "auth_middleware.py"), "Authorization = 'header'\ndef require_user(): return True\n", "utf8");
   fs.writeFileSync(path.join(root, "qdrant_store.py"), "class QdrantStore: pass\n", "utf8");
   fs.mkdirSync(path.join(root, "frontend", "src"), { recursive: true });
   fs.writeFileSync(path.join(root, "frontend", "package.json"), JSON.stringify({ dependencies: { react: "18.0.0", vite: "5.0.0" }, devDependencies: { typescript: "5.0.0" } }), "utf8");
@@ -329,7 +329,8 @@ test("optimize detects flat FastAPI Python layouts and collapses noisy directori
   assert.ok(backend.includes("auth_middleware.py"));
   assert.ok(backend.includes("qdrant_store.py"));
   assert.ok(frontend.includes("frontend/src/App.tsx"));
-  assert.ok(backend.includes("reference signal"));
+  assert.ok(backend.includes("import ref"));
+  assert.ok(backend.includes("text reference signal"));
   assert.ok(architecture.includes("FastAPI"));
   assert.ok(architecture.includes("Detection Gaps"));
   assert.ok(report.includes("temp_pipecat/**/__pycache__/"));
