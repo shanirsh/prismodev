@@ -68,8 +68,8 @@ Fixed:
 - Created .cursorignore
 - Generated prismo-dev-report.md
 - Generated .prismo/architecture-summary.md
-- Generated .prismo/recommended-CLAUDE.md
-- Generated .prismo/recommended-AGENTS.md
+- Generated .prismo/recommended-CLAUDE.boilerplate.md
+- Generated .prismo/recommended-AGENTS.boilerplate.md
 - Generated .prismo/recommended-.claudeignore
 - Generated .prismo/recommended-.cursorignore
 - Generated .prismo/recommended-.gitignore-additions
@@ -384,8 +384,8 @@ what doctor creates:
 .prismo/architecture-summary.md            compact project overview for agents
 .prismo/backend-summary.md                 backend-specific context
 .prismo/frontend-summary.md                frontend-specific context
-.prismo/recommended-CLAUDE.md              optimized CLAUDE.md template
-.prismo/recommended-AGENTS.md              optimized AGENTS.md template
+.prismo/recommended-CLAUDE.boilerplate.md              CLAUDE.md boilerplate reference; do not overwrite curated files
+.prismo/recommended-AGENTS.boilerplate.md              AGENTS.md boilerplate reference; do not overwrite curated files
 .prismo/recommended-.claudeignore          full recommended ignore list
 .prismo/recommended-.cursorignore          full recommended ignore list
 .prismo/recommended-.gitignore-additions   things your gitignore might be missing
@@ -600,8 +600,8 @@ no api keys. no intercepted prompts. no data uploaded.
 ├── frontend-summary.md
 ├── frontend-context.md
 ├── backend-context.md
-├── recommended-CLAUDE.md
-├── recommended-AGENTS.md
+├── recommended-CLAUDE.boilerplate.md
+├── recommended-AGENTS.boilerplate.md
 ├── recommended-.claudeignore
 ├── recommended-.cursorignore
 ├── recommended-.gitignore-additions

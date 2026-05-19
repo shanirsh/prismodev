@@ -216,12 +216,13 @@ test("optimize generates AI-readable context files in .prismo", () => {
   assert.ok(fs.existsSync(path.join(root, ".prismo", "architecture-summary.md")));
   assert.ok(fs.existsSync(path.join(root, ".prismo", "backend-summary.md")));
   assert.ok(fs.existsSync(path.join(root, ".prismo", "frontend-summary.md")));
-  assert.ok(fs.existsSync(path.join(root, ".prismo", "recommended-CLAUDE.md")));
-  assert.ok(fs.existsSync(path.join(root, ".prismo", "recommended-AGENTS.md")));
+  assert.ok(fs.existsSync(path.join(root, ".prismo", "recommended-CLAUDE.boilerplate.md")));
+  assert.ok(fs.existsSync(path.join(root, ".prismo", "recommended-AGENTS.boilerplate.md")));
   assert.ok(fs.existsSync(path.join(root, ".prismo", "recommended-.claudeignore")));
   assert.ok(fs.existsSync(path.join(root, ".prismo", "recommended-.cursorignore")));
   assert.ok(fs.existsSync(path.join(root, ".prismo", "recommended-.gitignore-additions")));
   assert.ok(fs.existsSync(path.join(root, ".prismo", "optimize-report.md")));
+  assert.ok(fs.readFileSync(path.join(root, ".prismo", "recommended-CLAUDE.boilerplate.md"), "utf8").includes("Do not overwrite an existing curated CLAUDE.md"));
 });
 
 test("optimize scoped frontend command generates frontend-context.md", () => {
@@ -239,6 +240,41 @@ test("optimize scoped frontend command generates frontend-context.md", () => {
   assert.equal(result.status, 0, result.stderr);
   assert.ok(fs.existsSync(path.join(root, ".prismo", "frontend-context.md")));
   assert.ok(fs.readFileSync(path.join(root, ".prismo", "frontend-context.md"), "utf8").includes("Button.tsx"));
+});
+
+test("optimize detects flat FastAPI Python layouts and collapses noisy directories", () => {
+  const root = tempRepo();
+  fs.writeFileSync(path.join(root, "requirements.txt"), "fastapi\nqdrant-client\nneo4j\n", "utf8");
+  fs.writeFileSync(path.join(root, "main.py"), "from fastapi import FastAPI\napp = FastAPI()\n", "utf8");
+  fs.writeFileSync(path.join(root, "chat_service.py"), "from fastapi import APIRouter\nrouter = APIRouter()\n", "utf8");
+  fs.writeFileSync(path.join(root, "memory_service.py"), "class MemoryService: pass\n", "utf8");
+  fs.writeFileSync(path.join(root, "auth_middleware.py"), "Authorization = 'header'\n", "utf8");
+  fs.writeFileSync(path.join(root, "qdrant_store.py"), "class QdrantStore: pass\n", "utf8");
+  fs.mkdirSync(path.join(root, "frontend", "src"), { recursive: true });
+  fs.writeFileSync(path.join(root, "frontend", "package.json"), JSON.stringify({ dependencies: { react: "18.0.0", vite: "5.0.0" }, devDependencies: { typescript: "5.0.0" } }), "utf8");
+  fs.writeFileSync(path.join(root, "frontend", "src", "App.tsx"), "export default function App() { return null }\n", "utf8");
+  fs.mkdirSync(path.join(root, "temp_pipecat", "transformers", "models", "a", "__pycache__"), { recursive: true });
+  fs.mkdirSync(path.join(root, "temp_pipecat", "transformers", "models", "b", "__pycache__"), { recursive: true });
+
+  const result = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "optimize", root],
+    { encoding: "utf8" }
+  );
+
+  assert.equal(result.status, 0, result.stderr);
+  const backend = fs.readFileSync(path.join(root, ".prismo", "backend-summary.md"), "utf8");
+  const frontend = fs.readFileSync(path.join(root, ".prismo", "frontend-summary.md"), "utf8");
+  const architecture = fs.readFileSync(path.join(root, ".prismo", "architecture-summary.md"), "utf8");
+  const report = fs.readFileSync(path.join(root, ".prismo", "optimize-report.md"), "utf8");
+  assert.ok(backend.includes("chat_service.py"));
+  assert.ok(backend.includes("memory_service.py"));
+  assert.ok(backend.includes("auth_middleware.py"));
+  assert.ok(backend.includes("qdrant_store.py"));
+  assert.ok(frontend.includes("frontend/src/App.tsx"));
+  assert.ok(architecture.includes("Detection Gaps"));
+  assert.ok(report.includes("temp_pipecat/**/__pycache__/"));
+  assert.equal((report.match(/__pycache__/g) || []).length < 5, true);
 });
 
 test("optimize --json outputs valid JSON only", () => {
