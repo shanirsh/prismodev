@@ -41,6 +41,7 @@ after you code      npx getprismo cc timeline
 - missing `.claudeignore` / `.cursorignore` (the biggest single fix for most repos)
 - lockfiles entering context (`package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`)
 - generated artifacts leaking in (`__pycache__`, `dist/`, `coverage/`, `.next/`)
+- operational source-stream dumps leaking in (`events/`, `source-streams/`, inbox/calendar/GitHub JSONL exports)
 - oversized instruction files (`CLAUDE.md` or `AGENTS.md` over 500 tokens)
 - tool output dominating sessions (repeated reads, large command output)
 - long-running sessions with stale context accumulation
@@ -396,6 +397,8 @@ if an existing `.claudeignore` or `.cursorignore` already covers prismo's recomm
 
 backend and frontend summaries include load-bearing candidates ranked by import references, text-reference signals, recent git touches when available, and file size, not just directory listings.
 
+prismo also flags source-stream dumps separately from normal build artifacts. large inbox/calendar/github/event payload files are treated as operational noise because they often get summarized once, written near the repo, and then accidentally re-read by later coding sessions.
+
 what doctor never touches:
 
 - your real `CLAUDE.md`
@@ -656,7 +659,7 @@ then your team can run `npm run ai:doctor` without remembering the full command.
 - openai codex
 - cursor
 - any tool that respects `.claudeignore` or `.cursorignore`
-- any repo (node, python, go, rust, monorepos, whatever)
+- any repo (node, python, go, rust, vue, svelte, astro, monorepos, whatever)
 
 ---
 

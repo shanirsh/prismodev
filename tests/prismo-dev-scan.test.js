@@ -92,8 +92,15 @@ test("superset ignores skip suggested files and state/secrets are recommended", 
     "package-lock.json",
     "yarn.lock",
     "pnpm-lock.yaml",
+    "bun.lockb",
     "test-results/",
     "playwright-report/",
+    "events/",
+    "event-dumps/",
+    "session-dumps/",
+    "source-streams/",
+    "inbox-dumps/",
+    "calendar-dumps/",
     "models/",
     "state-backups/",
     "backups/",
@@ -123,6 +130,28 @@ test("superset ignores skip suggested files and state/secrets are recommended", 
   assert.equal(fs.existsSync(path.join(root, ".claudeignore.prismo-suggested")), false);
   assert.equal(fs.existsSync(path.join(root, ".cursorignore.prismo-suggested")), false);
   assert.ok(actions.some((action) => action.includes("already covers Prismo recommendations")));
+});
+
+test("source-stream dumps are detected as operational context noise", () => {
+  const root = tempRepo();
+  fs.mkdirSync(path.join(root, "source-streams"), { recursive: true });
+  const rows = Array.from({ length: 80 }, (_, index) => JSON.stringify({
+    type: "calendar_event",
+    timestamp: `2026-05-${String((index % 20) + 1).padStart(2, "0")}T12:00:00Z`,
+    attendees: [`person${index}@example.com`, "team@example.com"],
+    subject: `planning ${index}`,
+    body: "mostly irrelevant event payload copied from an external source",
+    issue: { repository: "example/repo", body: "long issue body" },
+  })).join("\n");
+  fs.writeFileSync(path.join(root, "source-streams", "calendar-events.jsonl"), rows.repeat(12), "utf8");
+
+  const result = scanRepo(root);
+  const payload = toJsonPayload(result);
+  assert.equal(result.operationalNoise.level !== "Low", true);
+  assert.ok(result.issues.some((issue) => issue.category === "operational_noise"));
+  assert.ok(result.recommendedClaudeIgnore.includes("source-streams/"));
+  assert.ok(result.recommendedClaudeIgnore.includes("source-streams/calendar-events.jsonl"));
+  assert.ok(payload.operationalNoise.files.some((file) => file.path === "source-streams/calendar-events.jsonl"));
 });
 
 test("CLAUDE.md token estimate produces deterministic impact text and template", () => {
@@ -335,6 +364,32 @@ test("optimize detects flat FastAPI Python layouts and collapses noisy directori
   assert.ok(architecture.includes("Detection Gaps"));
   assert.ok(report.includes("temp_pipecat/**/__pycache__/"));
   assert.equal((report.match(/__pycache__/g) || []).length < 5, true);
+});
+
+test("optimize detects SvelteKit and non-React frontend layouts", () => {
+  const root = tempRepo();
+  fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({
+    dependencies: { "@sveltejs/kit": "2.0.0", svelte: "5.0.0" },
+    devDependencies: { vite: "5.0.0", typescript: "5.0.0" },
+  }), "utf8");
+  fs.writeFileSync(path.join(root, "svelte.config.js"), "export default {}\n", "utf8");
+  fs.mkdirSync(path.join(root, "src", "routes"), { recursive: true });
+  fs.mkdirSync(path.join(root, "src", "lib", "components"), { recursive: true });
+  fs.writeFileSync(path.join(root, "src", "routes", "+page.svelte"), "<script>import Widget from '$lib/components/Widget.svelte';</script><Widget />\n", "utf8");
+  fs.writeFileSync(path.join(root, "src", "lib", "components", "Widget.svelte"), "<h1>Widget</h1>\n", "utf8");
+
+  const result = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "optimize", root],
+    { encoding: "utf8" }
+  );
+
+  assert.equal(result.status, 0, result.stderr);
+  const architecture = fs.readFileSync(path.join(root, ".prismo", "architecture-summary.md"), "utf8");
+  const frontend = fs.readFileSync(path.join(root, ".prismo", "frontend-summary.md"), "utf8");
+  assert.ok(architecture.includes("SvelteKit"));
+  assert.ok(frontend.includes("src/routes/+page.svelte"));
+  assert.ok(frontend.includes("Widget.svelte"));
 });
 
 test("optimize --json outputs valid JSON only", () => {
