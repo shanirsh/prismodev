@@ -302,7 +302,6 @@ test("optimize scoped frontend command generates frontend-context.md", () => {
 
 test("optimize detects flat FastAPI Python layouts and collapses noisy directories", () => {
   const root = tempRepo();
-  fs.writeFileSync(path.join(root, "requirements.txt"), "fastapi\nqdrant-client\nneo4j\n", "utf8");
   fs.writeFileSync(path.join(root, "main.py"), "from fastapi import FastAPI\napp = FastAPI()\n", "utf8");
   fs.writeFileSync(path.join(root, "chat_service.py"), "from fastapi import APIRouter\nrouter = APIRouter()\n", "utf8");
   fs.writeFileSync(path.join(root, "memory_service.py"), "class MemoryService: pass\n", "utf8");
@@ -331,6 +330,7 @@ test("optimize detects flat FastAPI Python layouts and collapses noisy directori
   assert.ok(backend.includes("qdrant_store.py"));
   assert.ok(frontend.includes("frontend/src/App.tsx"));
   assert.ok(backend.includes("reference signal"));
+  assert.ok(architecture.includes("FastAPI"));
   assert.ok(architecture.includes("Detection Gaps"));
   assert.ok(report.includes("temp_pipecat/**/__pycache__/"));
   assert.equal((report.match(/__pycache__/g) || []).length < 5, true);
