@@ -1048,6 +1048,29 @@ test("init dry-run previews npm scripts without modifying package.json", () => {
   assert.equal(JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8")).scripts["ai:doctor"], undefined);
 });
 
+test("shield stores full command output and returns compact summary", () => {
+  const root = tempRepo();
+  const script = [
+    "console.log('line '.repeat(4000));",
+    "console.error('ERROR: build failed at src/app.ts');",
+  ].join("");
+  const result = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "shield", "--json", root, "--", process.execPath, "-e", script],
+    { encoding: "utf8" }
+  );
+
+  assert.equal(result.status, 0, result.stderr);
+  const payload = JSON.parse(result.stdout);
+  assert.equal(payload.exitCode, 0);
+  assert.ok(payload.output.estimatedTokens > 1000);
+  assert.ok(payload.output.interestingLines.some((line) => line.includes("ERROR: build failed")));
+  assert.ok(fs.existsSync(path.join(root, payload.stored.stdout)));
+  assert.ok(fs.existsSync(path.join(root, payload.stored.stderr)));
+  assert.ok(fs.existsSync(path.join(root, payload.stored.directory, "summary.json")));
+  assert.ok(fs.existsSync(path.join(root, ".prismo", "shield", "index.jsonl")));
+});
+
 test("missing scan path returns a clear error", () => {
   const missing = path.join(os.tmpdir(), "prismo-missing-path-for-test");
   const result = spawnSync(

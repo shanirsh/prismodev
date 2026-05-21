@@ -33,6 +33,7 @@ after you code      npx getprismo cc timeline
 **doctor** diagnoses the repo, applies safe fixes, and shows the before/after score.
 **watch** monitors context pressure live and warns when things go wrong.
 **cc timeline** reconstructs what happened in the session so you learn from it.
+**shield** runs noisy commands without dumping full output back into the agent context.
 
 ---
 
@@ -134,6 +135,42 @@ Run: npx getprismo doctor
 ```
 
 watch caught lockfiles entering context, a file being read 286 times, and tool output dominating the session. without this, you'd never know.
+
+---
+
+## new: context shield
+
+if you know a command may dump huge output, run it through prismo:
+
+```bash
+npx getprismo shield -- npm test
+npx getprismo shield -- pytest -q
+npx getprismo shield -- npm run build
+```
+
+shield executes the command locally, stores full stdout/stderr under `.prismo/shield/runs/`, and prints only a compact summary plus useful error lines.
+
+this is the lightweight context-sandbox layer: the full output stays on disk until you explicitly inspect it, instead of being pasted into the model context and re-sent every turn.
+
+example:
+
+```text
+Prismo Shield
+
+Command: npm test
+Exit: 1
+Captured: 186 KB (~46,500 tokens kept out of chat)
+
+Full Output Stored:
+- .prismo/shield/runs/2026-05-20T.../stdout.txt
+- .prismo/shield/runs/2026-05-20T.../stderr.txt
+
+Summary Returned To Context:
+- ERROR: auth.test.ts expected 200 received 401
+- FAIL src/auth/session.test.ts
+```
+
+this is intentionally not magic interception yet. it is a safe local-first primitive you can tell agents to use for noisy commands.
 
 ---
 
@@ -485,6 +522,7 @@ no install needed. npx runs it directly.
 | `scan --ci` | fail CI when token-risk gates fail |
 | `optimize` | generate `.prismo/` context packs |
 | `context` | print paste-ready prompt for agents |
+| `shield` | run noisy commands while keeping full output out of chat |
 | `setup` | detect tools, logs, proxy readiness |
 | `usage` | show raw session token usage |
 | `init` | add npm scripts and .prismo/README.md |
@@ -524,6 +562,14 @@ npx getprismo watch --rescue --json      # include rescuePrompt in JSON
 npx getprismo watch --once --redact-paths # hide local paths
 npx getprismo watch codex                # only codex sessions
 npx getprismo watch claude               # only claude code sessions
+```
+
+### shield mode
+
+```bash
+npx getprismo shield -- npm test
+npx getprismo shield -- pytest -q
+npx getprismo shield --json -- npm run build
 ```
 
 ---
