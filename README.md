@@ -22,18 +22,21 @@ prismodev catches it before, during, and after.
 
 ## the loop
 
-prismodev is three commands that cover an entire coding session:
+prismodev covers the full AI coding session:
 
 ```
 before you code     npx getprismo doctor
 while you code      npx getprismo watch
+noisy commands      npx getprismo shield -- npm test
 after you code      npx getprismo cc timeline
+agent-native        npx getprismo mcp
 ```
 
 **doctor** diagnoses the repo, applies safe fixes, and shows the before/after score.
 **watch** monitors context pressure live and warns when things go wrong.
 **cc timeline** reconstructs what happened in the session so you learn from it.
 **shield** runs noisy commands without dumping full output back into the agent context.
+**mcp** exposes PrismoDev as local tools so compatible agents can scan, search shield output, and request scoped context directly.
 
 ---
 
@@ -532,6 +535,7 @@ no install needed. npx runs it directly.
 | `optimize` | generate `.prismo/` context packs |
 | `context` | print paste-ready prompt for agents |
 | `shield` | run noisy commands while keeping full output out of chat |
+| `mcp` | expose PrismoDev tools over local MCP stdio |
 | `setup` | detect tools, logs, proxy readiness |
 | `usage` | show raw session token usage |
 | `init` | add npm scripts and .prismo/README.md |
@@ -581,6 +585,53 @@ npx getprismo shield -- pytest -q
 npx getprismo shield --json -- npm run build
 npx getprismo shield last
 npx getprismo shield search "auth failure"
+```
+
+### mcp mode
+
+```bash
+npx getprismo mcp
+npx getprismo mcp /path/to/repo
+```
+
+`mcp` starts a local stdio MCP server for agent clients. It exposes:
+
+- `prismo_scan`
+- `prismo_doctor_dry_run`
+- `prismo_watch_snapshot`
+- `prismo_shield_run`
+- `prismo_shield_search`
+- `prismo_shield_last`
+- `prismo_context_pack`
+- `prismo_firewall`
+- `prismo_cc_timeline`
+
+This lets an MCP-compatible agent search prior shielded test/build output, request scoped context packs, or inspect token-waste signals without pasting giant logs into the conversation.
+
+Generic MCP client config:
+
+```json
+{
+  "mcpServers": {
+    "prismodev": {
+      "command": "npx",
+      "args": ["-y", "getprismo", "mcp", "/path/to/your/repo"]
+    }
+  }
+}
+```
+
+For local development from this repo:
+
+```json
+{
+  "mcpServers": {
+    "prismodev": {
+      "command": "node",
+      "args": ["/path/to/prismodev/bin/prismo.js", "mcp", "/path/to/your/repo"]
+    }
+  }
+}
 ```
 
 ---
@@ -728,8 +779,10 @@ lib/prismo-dev/constants.js      shared defaults, pricing, patterns
 lib/prismo-dev/context-optimize.js  context packs, scoped prompts
 lib/prismo-dev/doctor.js         doctor/dev/init orchestration
 lib/prismo-dev/fixes.js          safe ignore/template generation
+lib/prismo-dev/mcp.js            local MCP server and Prismo tool bindings
 lib/prismo-dev/report.js         terminal, markdown, ci reports
 lib/prismo-dev/scan.js           repo scanning, scoring, readiness
+lib/prismo-dev/shield.js         local command shield and searchable output index
 lib/prismo-dev/usage-watch.js    local logs, watch, cost, timeline
 ```
 
@@ -739,8 +792,11 @@ lib/prismo-dev/usage-watch.js    local logs, watch, cost, timeline
 
 ```bash
 npx getprismo --help
+npx getprismo --version
 npx getprismo doctor --help
 npx getprismo watch --help
+npx getprismo shield --help
+npx getprismo mcp --help
 npx getprismo cc --help
 npx getprismo scan --help
 ```

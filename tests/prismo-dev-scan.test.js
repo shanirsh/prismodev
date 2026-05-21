@@ -1105,6 +1105,40 @@ test("shield last and search retrieve indexed output", () => {
   assert.ok(searchPayload.results.some((item) => String(item.snippet).includes("AUTH_FAILURE")));
 });
 
+test("--version prints the package version", () => {
+  const pkg = require("../package.json");
+  const result = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "--version"],
+    { encoding: "utf8" }
+  );
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout.trim(), pkg.version);
+});
+
+test("mcp server initializes and lists Prismo tools", () => {
+  const root = tempRepo();
+  const input = [
+    JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: {} }),
+    JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/list", params: {} }),
+    "",
+  ].join("\n");
+  const result = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "mcp", root],
+    { encoding: "utf8", input }
+  );
+
+  assert.equal(result.status, 0, result.stderr);
+  const lines = result.stdout.trim().split("\n").map((line) => JSON.parse(line));
+  assert.equal(lines[0].result.serverInfo.name, "prismodev");
+  const toolNames = lines[1].result.tools.map((tool) => tool.name);
+  assert.ok(toolNames.includes("prismo_scan"));
+  assert.ok(toolNames.includes("prismo_shield_search"));
+  assert.ok(toolNames.includes("prismo_cc_timeline"));
+});
+
 test("missing scan path returns a clear error", () => {
   const missing = path.join(os.tmpdir(), "prismo-missing-path-for-test");
   const result = spawnSync(
