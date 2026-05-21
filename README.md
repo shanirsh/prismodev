@@ -148,7 +148,7 @@ npx getprismo shield -- pytest -q
 npx getprismo shield -- npm run build
 ```
 
-shield executes the command locally, stores full stdout/stderr under `.prismo/shield/runs/`, and prints only a compact summary plus useful error lines.
+shield executes the command locally, stores full stdout/stderr under `.prismo/shield/runs/`, indexes the output in `.prismo/shield/shield.sqlite` using SQLite FTS5 when available, and prints only a compact summary plus useful error lines.
 
 this is the lightweight context-sandbox layer: the full output stays on disk until you explicitly inspect it, instead of being pasted into the model context and re-sent every turn.
 
@@ -164,10 +164,19 @@ Captured: 186 KB (~46,500 tokens kept out of chat)
 Full Output Stored:
 - .prismo/shield/runs/2026-05-20T.../stdout.txt
 - .prismo/shield/runs/2026-05-20T.../stderr.txt
+- .prismo/shield/shield.sqlite
 
 Summary Returned To Context:
 - ERROR: auth.test.ts expected 200 received 401
 - FAIL src/auth/session.test.ts
+```
+
+search previous shield output without reloading whole logs:
+
+```bash
+npx getprismo shield last
+npx getprismo shield search "auth expected 200"
+npx getprismo shield search "AUTH_FAILURE" --json
 ```
 
 this is intentionally not magic interception yet. it is a safe local-first primitive you can tell agents to use for noisy commands.
@@ -570,6 +579,8 @@ npx getprismo watch claude               # only claude code sessions
 npx getprismo shield -- npm test
 npx getprismo shield -- pytest -q
 npx getprismo shield --json -- npm run build
+npx getprismo shield last
+npx getprismo shield search "auth failure"
 ```
 
 ---

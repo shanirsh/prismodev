@@ -1071,6 +1071,40 @@ test("shield stores full command output and returns compact summary", () => {
   assert.ok(fs.existsSync(path.join(root, ".prismo", "shield", "index.jsonl")));
 });
 
+test("shield last and search retrieve indexed output", () => {
+  const root = tempRepo();
+  const script = [
+    "console.log('AUTH_FAILURE payment session expected 200 received 401 '.repeat(200));",
+    "console.error('ERROR: AUTH_FAILURE token expired in auth middleware');",
+  ].join("");
+  const run = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "shield", "--json", root, "--", process.execPath, "-e", script],
+    { encoding: "utf8" }
+  );
+  assert.equal(run.status, 0, run.stderr);
+
+  const last = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "shield", "last", "--json", root],
+    { encoding: "utf8" }
+  );
+  assert.equal(last.status, 0, last.stderr);
+  const lastPayload = JSON.parse(last.stdout);
+  assert.equal(lastPayload.runs.length, 1);
+  assert.ok(lastPayload.runs[0].command.includes(process.execPath));
+
+  const search = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "shield", "search", "AUTH_FAILURE", "--json", root],
+    { encoding: "utf8" }
+  );
+  assert.equal(search.status, 0, search.stderr);
+  const searchPayload = JSON.parse(search.stdout);
+  assert.ok(["sqlite-fts5", "jsonl-fallback"].includes(searchPayload.mode));
+  assert.ok(searchPayload.results.some((item) => String(item.snippet).includes("AUTH_FAILURE")));
+});
+
 test("missing scan path returns a clear error", () => {
   const missing = path.join(os.tmpdir(), "prismo-missing-path-for-test");
   const result = spawnSync(
