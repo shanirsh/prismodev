@@ -673,9 +673,12 @@ test("usage terminal output and watch --once --json are script-friendly", () => 
   assert.equal(payload.live.liveAction.cause, "tool-output-flood");
   assert.ok(payload.live.liveAction.now.length >= 2);
   assert.ok(payload.live.liveAction.rescueCommand.includes("watch --rescue"));
+  assert.equal(payload.live.liveAction.shieldPlan.mcp.runTool, "prismo_shield_run");
+  assert.equal(payload.live.liveAction.shieldPlan.mcp.searchTool, "prismo_shield_search");
+  assert.ok(payload.live.liveAction.shieldPlan.command.includes("npx getprismo shield --"));
   assert.equal(payload.live.activeSession.actionableRepeatedPaths.some((item) => item.value.includes("other-repo")), false);
   assert.equal(payload.live.activeSession.actionableRepeatedPaths.some((item) => item.value.includes("missing/local-file.js")), false);
-  assert.ok(payload.live.recommendedAction.includes("doctor"));
+  assert.ok(payload.live.recommendedAction.includes("shield"));
 
   const watchTerminal = spawnSync(
     process.execPath,
@@ -687,6 +690,8 @@ test("usage terminal output and watch --once --json are script-friendly", () => 
   assert.ok(watchTerminal.stdout.includes("Recent Growth"));
   assert.ok(watchTerminal.stdout.includes("Warnings"));
   assert.ok(watchTerminal.stdout.includes("Do This Now"));
+  assert.ok(watchTerminal.stdout.includes("Shield Plan"));
+  assert.ok(watchTerminal.stdout.includes("prismo_shield_run"));
   assert.ok(watchTerminal.stdout.includes("Cause:"));
   assert.ok(watchTerminal.stdout.includes("Suggested Action"));
   assert.equal(watchTerminal.stdout.includes("Refreshing every"), false);
@@ -699,6 +704,7 @@ test("usage terminal output and watch --once --json are script-friendly", () => 
   assert.equal(rescue.status, 0, rescue.stderr);
   assert.ok(rescue.stdout.includes("Prismo Rescue Prompt"));
   assert.ok(rescue.stdout.includes("Paste this into the current AI coding session"));
+  assert.ok(rescue.stdout.includes("Prismo shield"));
   assert.ok(rescue.stdout.includes("package-lock.json"));
 
   const rescueJson = spawnSync(
@@ -723,6 +729,7 @@ test("usage terminal output and watch --once --json are script-friendly", () => 
   const liveRescueText = fs.readFileSync(path.join(root, ".prismo", "live-rescue-prompt.md"), "utf8");
   assert.ok(guardrailsText.includes("Prismo Live Guardrails"));
   assert.ok(guardrailsText.includes("Effective Immediately"));
+  assert.ok(guardrailsText.includes("Prismo shield"));
   assert.ok(liveRescueText.includes("Prismo Rescue Prompt"));
 
   const throttle = spawnSync(
@@ -757,6 +764,7 @@ test("usage terminal output and watch --once --json are script-friendly", () => 
   const watchEvent = JSON.parse(fs.readFileSync(eventsPath, "utf8").trim().split(/\r?\n/)[0]);
   assert.equal(watchEvent.schemaVersion, 1);
   assert.equal(watchEvent.cause, autoPayload.live.liveAction.cause);
+  assert.equal(watchEvent.shieldPlan.mcp.runTool, "prismo_shield_run");
   assert.equal(autoPayload.firewallPath, ".prismo/context-firewall.md");
   assert.ok(fs.existsSync(path.join(root, ".prismo", "context-firewall.md")));
 

@@ -182,6 +182,15 @@ npx getprismo shield search "auth expected 200"
 npx getprismo shield search "AUTH_FAILURE" --json
 ```
 
+when `watch` detects tool-output floods or repeated command loops, it now recommends this flow directly:
+
+```text
+Shield Plan
+Run: npx getprismo shield -- <noisy command>
+Then: npx getprismo shield search "<error text>"
+MCP: prismo_shield_run -> prismo_shield_search
+```
+
 this is intentionally not magic interception yet. it is a safe local-first primitive you can tell agents to use for noisy commands.
 
 ---
@@ -800,3 +809,8 @@ npx getprismo mcp --help
 npx getprismo cc --help
 npx getprismo scan --help
 ```
+
+More docs:
+
+- [MCP setup and tools](docs/mcp.md)
+- [Live demo flow](docs/live-demo.md)
