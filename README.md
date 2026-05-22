@@ -52,6 +52,7 @@ agent-native        npx getprismo mcp
 - repeated file reads (same file loaded 100+ times in one session)
 - repeated commands (agent running the same command in a loop)
 - high context risk sessions that should have been split at task boundaries
+- session-derived ignore candidates from actual Claude/Codex logs (`logs/debug.log`, `dist/app.js`, `package-lock.json`, source-stream dumps)
 
 ---
 
@@ -95,6 +96,8 @@ Next:
 ```
 
 doctor went from 79 to 91 in one run. the repo now has proper ignore files, compact context packs, and a clear starting point for the next coding session.
+
+`scan --usage` and `doctor` can also turn real session leaks into concrete ignore suggestions. if local Claude/Codex logs show `logs/debug.log`, `dist/app.js`, `package-lock.json`, source-stream dumps, or other noisy files repeatedly entering context, prismodev adds conservative `.claudeignore` / `.cursorignore` candidate rules instead of only reporting the problem.
 
 ---
 

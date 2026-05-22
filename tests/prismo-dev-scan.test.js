@@ -814,6 +814,62 @@ test("scan --usage folds exact local session usage into diagnostics", () => {
   assert.ok(payload.recommendations.some((rec) => rec.includes("real session usage")));
 });
 
+test("scan --usage turns session context leaks into ignore suggestions", () => {
+  const root = tempRepo();
+  const codexHome = tempRepo();
+  const sessionDir = path.join(codexHome, "sessions", "2026", "05", "21");
+  fs.mkdirSync(sessionDir, { recursive: true });
+  fs.mkdirSync(path.join(root, "logs"), { recursive: true });
+  fs.mkdirSync(path.join(root, "dist"), { recursive: true });
+  fs.writeFileSync(path.join(root, "logs", "debug.log"), "debug", "utf8");
+  fs.writeFileSync(path.join(root, "dist", "app.js"), "bundle", "utf8");
+  fs.writeFileSync(path.join(root, "package-lock.json"), "{}", "utf8");
+  fs.writeFileSync(path.join(sessionDir, "leaks.jsonl"), [
+    JSON.stringify({ type: "event_msg", timestamp: "2026-05-21T10:00:00Z", payload: { type: "session_meta", cwd: root, model: "gpt-test" } }),
+    JSON.stringify({
+      type: "event_msg",
+      timestamp: "2026-05-21T10:01:00Z",
+      payload: {
+        type: "tool_result",
+        content: [
+          "failure included package-lock.json",
+          "logs/debug.log",
+          "dist/app.js",
+          "logs/debug.log",
+          "dist/app.js",
+        ].join("\n").repeat(20),
+      },
+    }),
+  ].join("\n"), "utf8");
+
+  const env = { ...process.env, PRISMO_CODEX_HOME: codexHome, PRISMO_CLAUDE_HOME: path.join(root, "none") };
+  const result = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "scan", "--usage", "--json", "--no-report", "--limit", "1", root],
+    { encoding: "utf8", env }
+  );
+
+  assert.equal(result.status, 0, result.stderr);
+  const payload = JSON.parse(result.stdout);
+  const patterns = payload.sessionIgnoreSuggestions.map((item) => item.pattern);
+  assert.ok(patterns.includes("package-lock.json"));
+  assert.ok(patterns.includes("logs/"));
+  assert.ok(patterns.includes("dist/"));
+  assert.ok(payload.suggestedClaudeIgnore.includes("logs/"));
+  assert.ok(payload.suggestedClaudeIgnore.includes("dist/"));
+  assert.ok(payload.issues.some((issue) => issue.title.includes("session-derived ignore")));
+
+  const report = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "scan", "--usage", "--limit", "1", root],
+    { encoding: "utf8", env }
+  );
+  assert.equal(report.status, 0, report.stderr);
+  const markdown = fs.readFileSync(path.join(root, ".prismo", "prismo-dev-report.md"), "utf8");
+  assert.ok(markdown.includes("Session-Derived Ignore Suggestions"));
+  assert.ok(markdown.includes("logs/"));
+});
+
 test("setup command reports detected tools and tracking modes without modifying config", () => {
   const root = tempRepo();
   const codexHome = tempRepo();

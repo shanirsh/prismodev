@@ -12,6 +12,7 @@ Shows:
 
 - before/after repo score
 - missing `.claudeignore` / `.cursorignore`
+- ignore suggestions derived from actual local Claude/Codex session leaks
 - generated artifacts exposed to AI context
 - compact `.prismo/` context packs
 - recommended next starting context
