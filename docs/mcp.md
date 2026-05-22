@@ -8,6 +8,16 @@ PrismoDev can run as a local MCP server so compatible coding agents can inspect 
 npx getprismo mcp /path/to/your/repo
 ```
 
+## Doctor
+
+Before adding PrismoDev to a client, validate the local MCP surface:
+
+```bash
+npx getprismo mcp doctor /path/to/your/repo
+```
+
+This checks that the MCP server can expose all Prismo tools, runs a scan smoke test, and prints a ready-to-use client config snippet.
+
 ## Generic MCP Config
 
 ```json

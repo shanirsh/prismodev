@@ -806,6 +806,7 @@ npx getprismo doctor --help
 npx getprismo watch --help
 npx getprismo shield --help
 npx getprismo mcp --help
+npx getprismo mcp doctor
 npx getprismo cc --help
 npx getprismo scan --help
 ```

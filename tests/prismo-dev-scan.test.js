@@ -1147,6 +1147,34 @@ test("mcp server initializes and lists Prismo tools", () => {
   assert.ok(toolNames.includes("prismo_cc_timeline"));
 });
 
+test("mcp doctor validates tools and prints config", () => {
+  const root = tempRepo();
+  const result = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "mcp", "doctor", "--json", root],
+    { encoding: "utf8" }
+  );
+
+  assert.equal(result.status, 0, result.stderr);
+  const payload = JSON.parse(result.stdout);
+  assert.equal(payload.ok, true);
+  assert.equal(payload.server.name, "prismodev");
+  assert.equal(payload.tools.count, 9);
+  assert.equal(payload.tools.hasShield, true);
+  assert.equal(payload.smoke.scan.ok, true);
+  assert.deepEqual(payload.config.mcpServers.prismodev.args.slice(0, 3), ["-y", "getprismo", "mcp"]);
+
+  const terminal = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "mcp", "doctor", root],
+    { encoding: "utf8" }
+  );
+  assert.equal(terminal.status, 0, terminal.stderr);
+  assert.ok(terminal.stdout.includes("Prismo MCP Doctor"));
+  assert.ok(terminal.stdout.includes("Status: ready"));
+  assert.ok(terminal.stdout.includes("\"getprismo\""));
+});
+
 test("missing scan path returns a clear error", () => {
   const missing = path.join(os.tmpdir(), "prismo-missing-path-for-test");
   const result = spawnSync(
