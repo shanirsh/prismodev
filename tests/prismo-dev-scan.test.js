@@ -1062,6 +1062,35 @@ test("doctor supports ignores-only and no-context-pack polish flags", () => {
   assert.deepEqual(payload.generatedFiles, []);
 });
 
+test("doctor --apply-suggestions appends missing ignore rules with backups", () => {
+  const root = tempRepo();
+  fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ dependencies: { react: "18.0.0" } }), "utf8");
+  fs.writeFileSync(path.join(root, ".claudeignore"), "custom-keep/\n", "utf8");
+  fs.writeFileSync(path.join(root, ".cursorignore"), "cursor-keep/\n", "utf8");
+  fs.mkdirSync(path.join(root, "dist"), { recursive: true });
+  fs.mkdirSync(path.join(root, "logs"), { recursive: true });
+
+  const result = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "doctor", "--apply-suggestions", "--no-context-packs", root],
+    { encoding: "utf8", env: { ...process.env, PRISMO_CODEX_HOME: path.join(root, "none"), PRISMO_CLAUDE_HOME: path.join(root, "none") } }
+  );
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.ok(result.stdout.includes("Applied Suggestions"));
+  assert.ok(result.stdout.includes("Backup written"));
+  const claudeIgnore = fs.readFileSync(path.join(root, ".claudeignore"), "utf8");
+  const cursorIgnore = fs.readFileSync(path.join(root, ".cursorignore"), "utf8");
+  assert.ok(claudeIgnore.includes("custom-keep/"));
+  assert.ok(claudeIgnore.includes("dist/"));
+  assert.ok(claudeIgnore.includes("logs/"));
+  assert.ok(cursorIgnore.includes("cursor-keep/"));
+  assert.ok(cursorIgnore.includes("dist/"));
+  assert.ok(fs.existsSync(path.join(root, ".claudeignore.prismo-backup")));
+  assert.ok(fs.existsSync(path.join(root, ".cursorignore.prismo-backup")));
+  assert.equal(fs.existsSync(path.join(root, ".claudeignore.prismo-suggested")), false);
+});
+
 test("optimize accepts arbitrary scope names for context packs", () => {
   const root = tempRepo();
   fs.mkdirSync(path.join(root, "backend", "app", "modules", "billing"), { recursive: true });

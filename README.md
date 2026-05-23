@@ -99,6 +99,8 @@ doctor went from 79 to 91 in one run. the repo now has proper ignore files, comp
 
 `scan --usage` and `doctor` can also turn real session leaks into concrete ignore suggestions. if local Claude/Codex logs show `logs/debug.log`, `dist/app.js`, `package-lock.json`, source-stream dumps, or other noisy files repeatedly entering context, prismodev adds conservative `.claudeignore` / `.cursorignore` candidate rules instead of only reporting the problem.
 
+when you want PrismoDev to apply those ignore suggestions directly, use `npx getprismo doctor --apply-suggestions`. it appends only missing rules, writes `.claudeignore.prismo-backup` / `.cursorignore.prismo-backup` first, and still does not touch `CLAUDE.md`, `AGENTS.md`, `.gitignore`, or source code.
+
 ---
 
 ## real output: watch
@@ -562,6 +564,7 @@ npx getprismo doctor                     # full run
 npx getprismo firewall auth-bug          # generate scoped context firewall
 npx getprismo doctor --dry-run           # preview without writing files
 npx getprismo doctor --apply-ignores-only # only create ignore files
+npx getprismo doctor --apply-suggestions # append missing ignore suggestions with backups
 npx getprismo doctor --no-context-packs  # skip .prismo/ generation
 npx getprismo doctor frontend            # scope to frontend
 npx getprismo doctor --json              # machine-readable output

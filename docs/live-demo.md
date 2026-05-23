@@ -6,6 +6,7 @@ Use this flow to show the full product loop on a real repo.
 
 ```bash
 npx getprismo doctor
+npx getprismo doctor --apply-suggestions
 ```
 
 Shows:
@@ -13,6 +14,7 @@ Shows:
 - before/after repo score
 - missing `.claudeignore` / `.cursorignore`
 - ignore suggestions derived from actual local Claude/Codex session leaks
+- optional safe append mode for missing ignore rules with backups
 - generated artifacts exposed to AI context
 - compact `.prismo/` context packs
 - recommended next starting context
