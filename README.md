@@ -866,9 +866,13 @@ lib/prismo-dev/report.js         terminal, markdown, ci reports
 lib/prismo-dev/scan.js           repo scanning, scoring, readiness
 lib/prismo-dev/scan-path-utils.js scan ignore/path helper logic
 lib/prismo-dev/shield.js         local command shield and searchable output index
+lib/prismo-dev/usage-cost.js     Claude Code cost and timeline analysis
 lib/prismo-dev/usage-log-utils.js local session log parsing helpers
-lib/prismo-dev/usage-watch.js    local logs, watch, cost, timeline
+lib/prismo-dev/usage-sessions.js local Codex/Claude session discovery
+lib/prismo-dev/usage-watch.js    watch orchestration, JSON payloads, live files
 lib/prismo-dev/utils.js          shared terminal/file/token helpers
+lib/prismo-dev/watch-live.js     live context-pressure decisions
+lib/prismo-dev/watch-render.js   watch terminal and guardrail renderers
 ```
 
 ---
