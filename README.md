@@ -864,7 +864,9 @@ lib/prismo-dev/fixes.js          safe ignore/template generation
 lib/prismo-dev/mcp.js            local MCP server and Prismo tool bindings
 lib/prismo-dev/report.js         terminal, markdown, ci reports
 lib/prismo-dev/scan.js           repo scanning, scoring, readiness
+lib/prismo-dev/scan-path-utils.js scan ignore/path helper logic
 lib/prismo-dev/shield.js         local command shield and searchable output index
+lib/prismo-dev/usage-log-utils.js local session log parsing helpers
 lib/prismo-dev/usage-watch.js    local logs, watch, cost, timeline
 lib/prismo-dev/utils.js          shared terminal/file/token helpers
 ```
