@@ -1091,6 +1091,30 @@ test("doctor --apply-suggestions appends missing ignore rules with backups", () 
   assert.equal(fs.existsSync(path.join(root, ".claudeignore.prismo-suggested")), false);
 });
 
+test("doctor --apply-suggestions --dry-run prints a readable ignore diff preview", () => {
+  const root = tempRepo();
+  fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ dependencies: { react: "18.0.0" } }), "utf8");
+  fs.writeFileSync(path.join(root, ".claudeignore"), "custom-keep/\n", "utf8");
+  fs.writeFileSync(path.join(root, ".cursorignore"), "cursor-keep/\n", "utf8");
+  fs.mkdirSync(path.join(root, "dist"), { recursive: true });
+
+  const result = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "doctor", "--apply-suggestions", "--dry-run", "--no-context-packs", root],
+    { encoding: "utf8", env: { ...process.env, PRISMO_CODEX_HOME: path.join(root, "none"), PRISMO_CLAUDE_HOME: path.join(root, "none") } }
+  );
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.ok(result.stdout.includes("Prismo Apply Suggestions Preview"));
+  assert.equal(result.stdout.includes("Estimated exposed context reduction"), false);
+  assert.ok(result.stdout.includes(".claudeignore\n+"));
+  assert.ok(result.stdout.includes("+ dist/"));
+  assert.ok(result.stdout.includes(".cursorignore\n+"));
+  assert.ok(result.stdout.includes("Run to apply:\nnpx getprismo doctor --apply-suggestions"));
+  assert.equal(fs.readFileSync(path.join(root, ".claudeignore"), "utf8"), "custom-keep/\n");
+  assert.equal(fs.existsSync(path.join(root, ".claudeignore.prismo-backup")), false);
+});
+
 test("optimize accepts arbitrary scope names for context packs", () => {
   const root = tempRepo();
   fs.mkdirSync(path.join(root, "backend", "app", "modules", "billing"), { recursive: true });

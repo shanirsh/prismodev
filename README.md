@@ -565,6 +565,7 @@ npx getprismo firewall auth-bug          # generate scoped context firewall
 npx getprismo doctor --dry-run           # preview without writing files
 npx getprismo doctor --apply-ignores-only # only create ignore files
 npx getprismo doctor --apply-suggestions # append missing ignore suggestions with backups
+npx getprismo doctor --apply-suggestions --dry-run # preview the exact ignore-rule diff
 npx getprismo doctor --no-context-packs  # skip .prismo/ generation
 npx getprismo doctor frontend            # scope to frontend
 npx getprismo doctor --json              # machine-readable output
