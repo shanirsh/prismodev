@@ -146,6 +146,42 @@ watch caught lockfiles entering context, a file being read 286 times, and tool o
 
 ---
 
+## new: optimizer fit
+
+not every token optimizer solves the same bottleneck. before stacking compression proxies, repo packers, code indexes, and MCP tools, run:
+
+```bash
+npx getprismo scan --optimizer-fit
+```
+
+PrismoDev scores your actual repo/session signals and recommends the right path:
+
+```text
+Prismo Optimizer Fit
+
+Primary bottleneck: Generated artifacts / ignore cleanup: HIGH
+
+Bottlenecks
+- Generated artifacts / ignore cleanup: High
+  .claudeignore is missing
+- Oversized command/tool output: Medium
+  237k tool/output tokens found in local sessions
+- Repeated source exploration: Low
+  Repo/source exploration does not look like the main bottleneck
+
+Recommended Stack
+1. Apply safe ignore/context fixes first.
+   Run: npx getprismo doctor --apply-suggestions --dry-run
+   Category: ignore cleanup (.claudeignore, .cursorignore)
+2. Sandbox noisy command output before adding more code-indexing tools.
+   Run: npx getprismo shield -- <noisy command>
+   Category: output sandboxing (Prismo shield, context-mode, RTK, tokf, distill)
+```
+
+This makes PrismoDev the measure-first layer: it tells you whether you need ignore cleanup, output sandboxing, code indexing, repo packing, instruction trimming, session splitting, or MCP/tool hygiene.
+
+---
+
 ## new: context shield
 
 if you know a command may dump huge output, run it through prismo:
@@ -543,6 +579,7 @@ no install needed. npx runs it directly.
 | `cc` | claude code cost breakdown |
 | `cc timeline` | session reconstruction with events |
 | `scan --usage` | full repo scan with local usage data |
+| `scan --optimizer-fit` | recommend which token-optimization path fits your repo/session |
 | `scan --simple` | plain-english summary |
 | `scan --fix` | create safe fix files |
 | `scan --ci` | fail CI when token-risk gates fail |

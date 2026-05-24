@@ -280,6 +280,45 @@ test("scan reports coding-agent readiness, optimization stack, tool-output risk,
   assert.equal(payload.agentReadiness.codex.exactProxyTracking, "available-when-using-api-key-base-url-mode");
 });
 
+test("scan --optimizer-fit recommends the right optimization path", () => {
+  const root = tempRepo();
+  const codexHome = tempRepo();
+  const sessionDir = path.join(codexHome, "sessions", "2026", "05", "24");
+  fs.mkdirSync(sessionDir, { recursive: true });
+  fs.mkdirSync(path.join(root, "logs"), { recursive: true });
+  fs.mkdirSync(path.join(root, "dist"), { recursive: true });
+  fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ scripts: { test: "echo ok" } }), "utf8");
+  fs.writeFileSync(path.join(root, "logs", "debug.log"), "error\n".repeat(20000), "utf8");
+  fs.writeFileSync(path.join(root, "dist", "bundle.js"), "x".repeat(700 * 1024), "utf8");
+  fs.writeFileSync(path.join(sessionDir, "optimizer-fit.jsonl"), [
+    JSON.stringify({ type: "event_msg", timestamp: "2026-05-24T10:00:00Z", payload: { type: "session_meta", cwd: root, model: "gpt-test" } }),
+    JSON.stringify({ type: "event_msg", timestamp: "2026-05-24T10:01:00Z", payload: { type: "tool_result", content: "logs/debug.log dist/bundle.js package-lock.json\n".repeat(1000) } }),
+  ].join("\n"), "utf8");
+
+  const env = { ...process.env, PRISMO_CODEX_HOME: codexHome, PRISMO_CLAUDE_HOME: path.join(root, "none") };
+  const terminal = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "scan", "--optimizer-fit", "--limit", "1", root],
+    { encoding: "utf8", env }
+  );
+  assert.equal(terminal.status, 0, terminal.stderr);
+  assert.ok(terminal.stdout.includes("Prismo Optimizer Fit"));
+  assert.ok(terminal.stdout.includes("Recommended Stack"));
+  assert.ok(terminal.stdout.includes("Prismo shield") || terminal.stdout.includes("doctor --apply-suggestions"));
+  assert.equal(fs.existsSync(path.join(root, ".prismo", "prismo-dev-report.md")), false);
+
+  const json = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "scan", "--optimizer-fit", "--json", "--limit", "1", root],
+    { encoding: "utf8", env }
+  );
+  assert.equal(json.status, 0, json.stderr);
+  const payload = JSON.parse(json.stdout);
+  assert.equal(payload.optimizerFit.schemaVersion, 1);
+  assert.ok(payload.optimizerFit.bottlenecks.some((item) => item.id === "output-sandboxing"));
+  assert.ok(payload.optimizerFit.recommendedStack.length >= 1);
+});
+
 test("optimize generates AI-readable context files in .prismo", () => {
   const root = tempRepo();
   fs.mkdirSync(path.join(root, "frontend", "src", "app"), { recursive: true });
