@@ -180,6 +180,33 @@ Recommended Stack
 
 This makes PrismoDev the measure-first layer: it tells you whether you need ignore cleanup, output sandboxing, code indexing, repo packing, instruction trimming, session splitting, or MCP/tool hygiene.
 
+For the short version:
+
+```bash
+npx getprismo scan --report-card
+```
+
+That prints the simplest decision:
+
+```text
+PrismoDev Report Card
+
+Biggest waste: Generated artifacts / ignore cleanup: High
+Start with: npx getprismo doctor --apply-suggestions --dry-run
+Then: npx getprismo shield -- <noisy command>
+Code index needed: not yet
+Round-trip risk: Low
+```
+
+To benchmark a noisy command:
+
+```bash
+npx getprismo benchmark -- npm test
+npx getprismo benchmark session
+```
+
+`benchmark -- <command>` measures raw command output tokens versus the compact shield summary. `benchmark session` summarizes recent local Claude/Codex sessions, including round-trip context signals like tool calls, repeated commands, repeated source reads, and MCP/tool surface.
+
 ---
 
 ## new: context shield
@@ -580,6 +607,8 @@ no install needed. npx runs it directly.
 | `cc timeline` | session reconstruction with events |
 | `scan --usage` | full repo scan with local usage data |
 | `scan --optimizer-fit` | recommend which token-optimization path fits your repo/session |
+| `scan --report-card` | shortest decision-layer summary |
+| `benchmark` | measure command-output reduction or recent session round-trip context |
 | `scan --simple` | plain-english summary |
 | `scan --fix` | create safe fix files |
 | `scan --ci` | fail CI when token-risk gates fail |

@@ -317,6 +317,18 @@ test("scan --optimizer-fit recommends the right optimization path", () => {
   assert.equal(payload.optimizerFit.schemaVersion, 1);
   assert.ok(payload.optimizerFit.bottlenecks.some((item) => item.id === "output-sandboxing"));
   assert.ok(payload.optimizerFit.recommendedStack.length >= 1);
+  assert.ok(payload.optimizerFit.roundTripContext);
+  assert.ok(payload.optimizerFit.toolFit.some((item) => item.examples.includes("context-mode")));
+
+  const reportCard = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "scan", "--report-card", "--limit", "1", root],
+    { encoding: "utf8", env }
+  );
+  assert.equal(reportCard.status, 0, reportCard.stderr);
+  assert.ok(reportCard.stdout.includes("PrismoDev Report Card"));
+  assert.ok(reportCard.stdout.includes("Biggest waste"));
+  assert.equal(fs.existsSync(path.join(root, ".prismo", "prismo-dev-report.md")), false);
 });
 
 test("optimize generates AI-readable context files in .prismo", () => {
@@ -1259,6 +1271,41 @@ test("shield last and search retrieve indexed output", () => {
   const searchPayload = JSON.parse(search.stdout);
   assert.ok(["sqlite-fts5", "jsonl-fallback"].includes(searchPayload.mode));
   assert.ok(searchPayload.results.some((item) => String(item.snippet).includes("AUTH_FAILURE")));
+});
+
+test("benchmark measures command output and session round trips", () => {
+  const root = tempRepo();
+  const script = [
+    "console.log('AUTH_FAILURE payment session expected 200 received 401 '.repeat(200));",
+    "console.error('ERROR: AUTH_FAILURE token expired in auth middleware');",
+  ].join("");
+  const command = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "benchmark", "--json", root, "--", process.execPath, "-e", script],
+    { encoding: "utf8" }
+  );
+  assert.equal(command.status, 0, command.stderr);
+  const commandPayload = JSON.parse(command.stdout);
+  assert.equal(commandPayload.mode, "command");
+  assert.ok(commandPayload.rawOutput.estimatedTokens > commandPayload.shieldedSummary.estimatedTokens);
+  assert.ok(commandPayload.estimatedTokenReductionPercent > 0);
+
+  const codexHome = tempRepo();
+  const sessionDir = path.join(codexHome, "sessions", "2026", "05", "24");
+  fs.mkdirSync(sessionDir, { recursive: true });
+  fs.writeFileSync(path.join(sessionDir, "bench.jsonl"), [
+    JSON.stringify({ type: "event_msg", timestamp: "2026-05-24T10:00:00Z", payload: { type: "session_meta", cwd: root, model: "gpt-test" } }),
+    JSON.stringify({ type: "event_msg", timestamp: "2026-05-24T10:01:00Z", payload: { type: "tool_result", content: "src/app.ts npm test failed\n".repeat(20) } }),
+  ].join("\n"), "utf8");
+  const session = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "benchmark", "session", "--json", "--limit", "1", root],
+    { encoding: "utf8", env: { ...process.env, PRISMO_CODEX_HOME: codexHome, PRISMO_CLAUDE_HOME: path.join(root, "none") } }
+  );
+  assert.equal(session.status, 0, session.stderr);
+  const sessionPayload = JSON.parse(session.stdout);
+  assert.equal(sessionPayload.mode, "session");
+  assert.ok(sessionPayload.roundTripContext);
 });
 
 test("--version prints the package version", () => {
