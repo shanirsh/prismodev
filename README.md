@@ -866,6 +866,7 @@ lib/prismo-dev/report.js         terminal, markdown, ci reports
 lib/prismo-dev/scan.js           repo scanning, scoring, readiness
 lib/prismo-dev/shield.js         local command shield and searchable output index
 lib/prismo-dev/usage-watch.js    local logs, watch, cost, timeline
+lib/prismo-dev/utils.js          shared terminal/file/token helpers
 ```
 
 ---
