@@ -41,7 +41,7 @@
   "scripts": {
     "demo": "node bin/prismo.js demo",
     "scan": "node bin/prismo.js scan",
-    "test": "node --test tests/prismo-dev-scan.test.js",
-    "test:scan": "node --test tests/prismo-dev-scan.test.js"
+    "test": "node --test \"tests/*.test.js\"",
+    "test:scan": "node --test \"tests/*.test.js\""
   }
 }
