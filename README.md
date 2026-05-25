@@ -552,6 +552,16 @@ watch reads local session logs from codex and claude code. it detects:
 
 watch tells you the single most useful action to take right now. usually: start a fresh session, or switch to a scoped context pack.
 
+if you run multiple agents in the same repo, use:
+
+```bash
+npx getprismo watch --agents
+```
+
+multi-agent watch shows every visible local Codex/Claude Code session for the repo, ranks each agent by context pressure, and flags coordination risks like two agents repeatedly loading the same file, shared artifact leaks, multiple high-pressure sessions, or agents that should move noisy commands into `shield`.
+
+the same multi-agent coordination signal is included in `usage --json`, `scan --usage --json`, doctor output, and the generated markdown report whenever multiple local sessions are visible for the repo.
+
 `watch --rescue` prints a paste-ready prompt for the active coding session. use it when the agent is looping, reading too many files, or flooding context with logs:
 
 ```bash
@@ -644,6 +654,8 @@ npx getprismo doctor --json              # machine-readable output
 ```bash
 npx getprismo watch                      # live refresh
 npx getprismo watch --once               # single snapshot
+npx getprismo watch --agents             # multi-agent coordination view
+npx getprismo watch --agents --json      # machine-readable multi-agent state
 npx getprismo watch --once --report      # write .prismo/watch-report.md
 npx getprismo watch --once --json        # machine-readable
 npx getprismo watch --auto               # guardrails + throttle + 600k budget

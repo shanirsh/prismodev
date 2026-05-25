@@ -329,3 +329,85 @@ test("usage terminal output and watch --once --json are script-friendly", () => 
   assert.ok(fs.existsSync(path.join(root, ".prismo", "watch-report.md")));
   assert.ok(fs.readFileSync(path.join(root, ".prismo", "watch-report.md"), "utf8").includes("Prismo Watch Report"));
 });
+
+test("watch --agents shows multi-agent coordination risks", () => {
+  const root = tempRepo();
+  const codexHome = tempRepo();
+  const sessionDir = path.join(codexHome, "sessions", "2026", "05", "25");
+  fs.mkdirSync(sessionDir, { recursive: true });
+  fs.mkdirSync(path.join(root, "src"), { recursive: true });
+  fs.writeFileSync(path.join(root, "src", "shared.js"), "export const shared = true;\n", "utf8");
+  fs.writeFileSync(path.join(root, "package-lock.json"), "{}", "utf8");
+
+  const noisyOutput = [
+    "ERROR: auth failed",
+    "package-lock.json",
+  ].join("\n").repeat(25000);
+  const makeSession = (id, minute) => [
+    JSON.stringify({ type: "event_msg", timestamp: `2026-05-25T10:${minute}:00Z`, payload: { type: "session_meta", id, cwd: root, model: "gpt-test" } }),
+    ...Array.from({ length: 4 }, (_, index) => JSON.stringify({
+      type: "event_msg",
+      timestamp: `2026-05-25T10:${minute}:0${index + 1}Z`,
+      payload: { type: "tool_result", content: `src/shared.js\n${noisyOutput}` },
+    })),
+  ].join("\n");
+  fs.writeFileSync(path.join(sessionDir, "agent-one.jsonl"), makeSession("agent-one", "01"), "utf8");
+  fs.writeFileSync(path.join(sessionDir, "agent-two.jsonl"), makeSession("agent-two", "03"), "utf8");
+
+  const env = { ...process.env, PRISMO_CODEX_HOME: codexHome, PRISMO_CLAUDE_HOME: path.join(root, "none") };
+  const json = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "watch", "codex", "--agents", "--once", "--json", "--limit", "2", root],
+    { encoding: "utf8", env }
+  );
+  assert.equal(json.status, 0, json.stderr);
+  const payload = JSON.parse(json.stdout);
+  assert.equal(payload.multiAgent.enabled, true);
+  assert.equal(payload.multiAgent.agentCount, 2);
+  assert.ok(payload.multiAgent.coordinationWarnings.some((warning) => warning.includes("src/shared.js")));
+  assert.ok(payload.multiAgent.sharedFiles.some((item) => item.path === "src/shared.js"));
+  assert.ok(payload.multiAgent.sharedArtifacts.some((item) => item.type === "lockfiles"));
+  assert.ok(payload.multiAgent.recommendedActions.some((action) => action.includes("shield")));
+
+  const usage = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "usage", "codex", "--json", "--limit", "2", root],
+    { encoding: "utf8", env }
+  );
+  assert.equal(usage.status, 0, usage.stderr);
+  const usagePayload = JSON.parse(usage.stdout);
+  assert.equal(usagePayload.multiAgent.enabled, true);
+  assert.equal(usagePayload.multiAgent.agentCount, 2);
+
+  const scan = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "scan", "--usage", "--json", "--no-report", "--limit", "2", root],
+    { encoding: "utf8", env }
+  );
+  assert.equal(scan.status, 0, scan.stderr);
+  const scanPayload = JSON.parse(scan.stdout);
+  assert.equal(scanPayload.realUsage.multiAgent.enabled, true);
+  assert.equal(scanPayload.realUsage.multiAgent.agentCount, 2);
+
+  const doctor = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "doctor", "--json", "--dry-run", "--limit", "2", root],
+    { encoding: "utf8", env }
+  );
+  assert.equal(doctor.status, 0, doctor.stderr);
+  const doctorPayload = JSON.parse(doctor.stdout);
+  assert.equal(doctorPayload.before.realUsage.multiAgent.enabled, true);
+  assert.equal(doctorPayload.before.realUsage.multiAgent.agentCount, 2);
+
+  const terminal = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "watch", "codex", "--agents", "--once", "--limit", "2", root],
+    { encoding: "utf8", env }
+  );
+  assert.equal(terminal.status, 0, terminal.stderr);
+  assert.ok(terminal.stdout.includes("Prismo Multi-Agent Watch"));
+  assert.ok(terminal.stdout.includes("Active Agents"));
+  assert.ok(terminal.stdout.includes("Coordination Warnings"));
+  assert.ok(terminal.stdout.includes("Shared Repeated Files"));
+  assert.ok(terminal.stdout.includes("src/shared.js"));
+});
