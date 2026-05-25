@@ -28,7 +28,7 @@ test("dev command runs guided scan, optimize, and prompt flow", () => {
   const result = spawnSync(
     process.execPath,
     [path.join(__dirname, "..", "bin", "prismo.js"), "dev", "--json", "--limit", "1", root],
-    { encoding: "utf8", env: { ...process.env, PRISMO_CODEX_HOME: codexHome, PRISMO_CLAUDE_HOME: path.join(root, "none") } }
+    { encoding: "utf8", env: { ...process.env, PRISMO_CODEX_HOME: codexHome, PRISMO_CLAUDE_HOME: path.join(root, "none"), PRISMO_CURSOR_HOME: path.join(root, "none"), PRISMO_CURSOR_APP_SUPPORT: path.join(root, "none") } }
   );
 
   assert.equal(result.status, 0, result.stderr);
@@ -49,7 +49,7 @@ test("doctor command safely optimizes repo and reports before/after payoff", () 
   const result = spawnSync(
     process.execPath,
     [path.join(__dirname, "..", "bin", "prismo.js"), "doctor", root],
-    { encoding: "utf8", env: { ...process.env, PRISMO_CODEX_HOME: path.join(root, "none"), PRISMO_CLAUDE_HOME: path.join(root, "none") } }
+    { encoding: "utf8", env: { ...process.env, PRISMO_CODEX_HOME: path.join(root, "none"), PRISMO_CLAUDE_HOME: path.join(root, "none"), PRISMO_CURSOR_HOME: path.join(root, "none"), PRISMO_CURSOR_APP_SUPPORT: path.join(root, "none") } }
   );
 
   assert.equal(result.status, 0, result.stderr);
@@ -78,7 +78,7 @@ test("doctor --json outputs valid before/after payload only", () => {
   const result = spawnSync(
     process.execPath,
     [path.join(__dirname, "..", "bin", "prismo.js"), "doctor", "--json", root],
-    { encoding: "utf8", env: { ...process.env, PRISMO_CODEX_HOME: path.join(root, "none"), PRISMO_CLAUDE_HOME: path.join(root, "none") } }
+    { encoding: "utf8", env: { ...process.env, PRISMO_CODEX_HOME: path.join(root, "none"), PRISMO_CLAUDE_HOME: path.join(root, "none"), PRISMO_CURSOR_HOME: path.join(root, "none"), PRISMO_CURSOR_APP_SUPPORT: path.join(root, "none") } }
   );
 
   assert.equal(result.status, 0, result.stderr);
@@ -101,7 +101,7 @@ test("doctor --dry-run does not write optimization files", () => {
   const result = spawnSync(
     process.execPath,
     [path.join(__dirname, "..", "bin", "prismo.js"), "doctor", "--dry-run", root],
-    { encoding: "utf8", env: { ...process.env, PRISMO_CODEX_HOME: path.join(root, "none"), PRISMO_CLAUDE_HOME: path.join(root, "none") } }
+    { encoding: "utf8", env: { ...process.env, PRISMO_CODEX_HOME: path.join(root, "none"), PRISMO_CLAUDE_HOME: path.join(root, "none"), PRISMO_CURSOR_HOME: path.join(root, "none"), PRISMO_CURSOR_APP_SUPPORT: path.join(root, "none") } }
   );
 
   assert.equal(result.status, 0, result.stderr);
@@ -119,7 +119,7 @@ test("doctor supports ignores-only and no-context-pack polish flags", () => {
   const ignoresOnly = spawnSync(
     process.execPath,
     [path.join(__dirname, "..", "bin", "prismo.js"), "doctor", "--apply-ignores-only", root],
-    { encoding: "utf8", env: { ...process.env, PRISMO_CODEX_HOME: path.join(root, "none"), PRISMO_CLAUDE_HOME: path.join(root, "none") } }
+    { encoding: "utf8", env: { ...process.env, PRISMO_CODEX_HOME: path.join(root, "none"), PRISMO_CLAUDE_HOME: path.join(root, "none"), PRISMO_CURSOR_HOME: path.join(root, "none"), PRISMO_CURSOR_APP_SUPPORT: path.join(root, "none") } }
   );
 
   assert.equal(ignoresOnly.status, 0, ignoresOnly.stderr);
@@ -134,7 +134,7 @@ test("doctor supports ignores-only and no-context-pack polish flags", () => {
   const noContext = spawnSync(
     process.execPath,
     [path.join(__dirname, "..", "bin", "prismo.js"), "doctor", "--no-context-packs", "--json", noContextRoot],
-    { encoding: "utf8", env: { ...process.env, PRISMO_CODEX_HOME: path.join(noContextRoot, "none"), PRISMO_CLAUDE_HOME: path.join(noContextRoot, "none") } }
+    { encoding: "utf8", env: { ...process.env, PRISMO_CODEX_HOME: path.join(noContextRoot, "none"), PRISMO_CLAUDE_HOME: path.join(noContextRoot, "none"), PRISMO_CURSOR_HOME: path.join(noContextRoot, "none"), PRISMO_CURSOR_APP_SUPPORT: path.join(noContextRoot, "none") } }
   );
   assert.equal(noContext.status, 0, noContext.stderr);
   const payload = JSON.parse(noContext.stdout);
@@ -154,7 +154,7 @@ test("doctor --apply-suggestions appends missing ignore rules with backups", () 
   const result = spawnSync(
     process.execPath,
     [path.join(__dirname, "..", "bin", "prismo.js"), "doctor", "--apply-suggestions", "--no-context-packs", root],
-    { encoding: "utf8", env: { ...process.env, PRISMO_CODEX_HOME: path.join(root, "none"), PRISMO_CLAUDE_HOME: path.join(root, "none") } }
+    { encoding: "utf8", env: { ...process.env, PRISMO_CODEX_HOME: path.join(root, "none"), PRISMO_CLAUDE_HOME: path.join(root, "none"), PRISMO_CURSOR_HOME: path.join(root, "none"), PRISMO_CURSOR_APP_SUPPORT: path.join(root, "none") } }
   );
 
   assert.equal(result.status, 0, result.stderr);
@@ -182,7 +182,7 @@ test("doctor --apply-suggestions --dry-run prints a readable ignore diff preview
   const result = spawnSync(
     process.execPath,
     [path.join(__dirname, "..", "bin", "prismo.js"), "doctor", "--apply-suggestions", "--dry-run", "--no-context-packs", root],
-    { encoding: "utf8", env: { ...process.env, PRISMO_CODEX_HOME: path.join(root, "none"), PRISMO_CLAUDE_HOME: path.join(root, "none") } }
+    { encoding: "utf8", env: { ...process.env, PRISMO_CODEX_HOME: path.join(root, "none"), PRISMO_CLAUDE_HOME: path.join(root, "none"), PRISMO_CURSOR_HOME: path.join(root, "none"), PRISMO_CURSOR_APP_SUPPORT: path.join(root, "none") } }
   );
 
   assert.equal(result.status, 0, result.stderr);

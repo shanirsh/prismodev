@@ -29,7 +29,7 @@ test("setup command reports detected tools and tracking modes without modifying 
   const result = spawnSync(
     process.execPath,
     [path.join(__dirname, "..", "bin", "prismo.js"), "setup", "--json", "--skip-proxy-check", "--limit", "1", root],
-    { encoding: "utf8", env: { ...process.env, PRISMO_CODEX_HOME: codexHome, PRISMO_CLAUDE_HOME: path.join(root, "none") } }
+    { encoding: "utf8", env: { ...process.env, PRISMO_CODEX_HOME: codexHome, PRISMO_CLAUDE_HOME: path.join(root, "none"), PRISMO_CURSOR_HOME: path.join(root, "none"), PRISMO_CURSOR_APP_SUPPORT: path.join(root, "none") } }
   );
 
   assert.equal(result.status, 0, result.stderr);
@@ -197,7 +197,7 @@ test("benchmark measures command output and session round trips", () => {
   const session = spawnSync(
     process.execPath,
     [path.join(__dirname, "..", "bin", "prismo.js"), "benchmark", "session", "--json", "--limit", "1", root],
-    { encoding: "utf8", env: { ...process.env, PRISMO_CODEX_HOME: codexHome, PRISMO_CLAUDE_HOME: path.join(root, "none") } }
+    { encoding: "utf8", env: { ...process.env, PRISMO_CODEX_HOME: codexHome, PRISMO_CLAUDE_HOME: path.join(root, "none"), PRISMO_CURSOR_HOME: path.join(root, "none"), PRISMO_CURSOR_APP_SUPPORT: path.join(root, "none") } }
   );
   assert.equal(session.status, 0, session.stderr);
   const sessionPayload = JSON.parse(session.stdout);
@@ -245,14 +245,14 @@ test("mcp doctor validates tools and prints config", () => {
   const result = spawnSync(
     process.execPath,
     [path.join(__dirname, "..", "bin", "prismo.js"), "mcp", "doctor", "--json", root],
-    { encoding: "utf8" }
+    { encoding: "utf8", env: { ...process.env, PRISMO_CURSOR_HOME: path.join(root, "none"), PRISMO_CURSOR_APP_SUPPORT: path.join(root, "none") } }
   );
 
   assert.equal(result.status, 0, result.stderr);
   const payload = JSON.parse(result.stdout);
   assert.equal(payload.ok, true);
   assert.equal(payload.server.name, "prismodev");
-  assert.equal(payload.tools.count, 10);
+  assert.equal(payload.tools.count, 11);
   assert.equal(payload.tools.hasShield, true);
   assert.equal(payload.smoke.scan.ok, true);
   assert.deepEqual(payload.config.mcpServers.prismodev.args.slice(0, 3), ["-y", "getprismo", "mcp"]);
@@ -260,7 +260,7 @@ test("mcp doctor validates tools and prints config", () => {
   const terminal = spawnSync(
     process.execPath,
     [path.join(__dirname, "..", "bin", "prismo.js"), "mcp", "doctor", root],
-    { encoding: "utf8" }
+    { encoding: "utf8", env: { ...process.env, PRISMO_CURSOR_HOME: path.join(root, "none"), PRISMO_CURSOR_APP_SUPPORT: path.join(root, "none") } }
   );
   assert.equal(terminal.status, 0, terminal.stderr);
   assert.ok(terminal.stdout.includes("Prismo MCP Doctor"));

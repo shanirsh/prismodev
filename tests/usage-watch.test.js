@@ -26,7 +26,7 @@ test("usage command reads exact Codex token_count events from local JSONL", () =
   const result = spawnSync(
     process.execPath,
     [path.join(__dirname, "..", "bin", "prismo.js"), "usage", "codex", "--json", "--limit", "1", root],
-    { encoding: "utf8", env: { ...process.env, PRISMO_CODEX_HOME: codexHome, PRISMO_CLAUDE_HOME: path.join(root, "none") } }
+    { encoding: "utf8", env: { ...process.env, PRISMO_CODEX_HOME: codexHome, PRISMO_CLAUDE_HOME: path.join(root, "none"), PRISMO_CURSOR_HOME: path.join(root, "none"), PRISMO_CURSOR_APP_SUPPORT: path.join(root, "none") } }
   );
 
   assert.equal(result.status, 0, result.stderr);
@@ -67,8 +67,12 @@ test("usage summary reads exact Claude Code message usage from local JSONL", () 
 
   const originalClaudeHome = process.env.PRISMO_CLAUDE_HOME;
   const originalCodexHome = process.env.PRISMO_CODEX_HOME;
+  const originalCursorHome = process.env.PRISMO_CURSOR_HOME;
+  const originalCursorAppSupport = process.env.PRISMO_CURSOR_APP_SUPPORT;
   process.env.PRISMO_CLAUDE_HOME = claudeHome;
   process.env.PRISMO_CODEX_HOME = path.join(root, "none");
+  process.env.PRISMO_CURSOR_HOME = path.join(root, "none");
+  process.env.PRISMO_CURSOR_APP_SUPPORT = path.join(root, "none");
   try {
     const payload = getUsageSummary({ tool: "claude", cwd: root, limit: 1 });
     assert.equal(payload.sessions[0].tool, "claude-code");
@@ -80,6 +84,10 @@ test("usage summary reads exact Claude Code message usage from local JSONL", () 
     else process.env.PRISMO_CLAUDE_HOME = originalClaudeHome;
     if (originalCodexHome === undefined) delete process.env.PRISMO_CODEX_HOME;
     else process.env.PRISMO_CODEX_HOME = originalCodexHome;
+    if (originalCursorHome === undefined) delete process.env.PRISMO_CURSOR_HOME;
+    else process.env.PRISMO_CURSOR_HOME = originalCursorHome;
+    if (originalCursorAppSupport === undefined) delete process.env.PRISMO_CURSOR_APP_SUPPORT;
+    else process.env.PRISMO_CURSOR_APP_SUPPORT = originalCursorAppSupport;
   }
 });
 
@@ -194,7 +202,7 @@ test("usage terminal output and watch --once --json are script-friendly", () => 
       payload: { type: "token_count", info: { total_token_usage: { input_tokens: 100, output_tokens: 50, total_tokens: 150 } } },
     }),
   ].join("\n"), "utf8");
-  const env = { ...process.env, PRISMO_CODEX_HOME: codexHome, PRISMO_CLAUDE_HOME: path.join(root, "none") };
+  const env = { ...process.env, PRISMO_CODEX_HOME: codexHome, PRISMO_CLAUDE_HOME: path.join(root, "none"), PRISMO_CURSOR_HOME: path.join(root, "none"), PRISMO_CURSOR_APP_SUPPORT: path.join(root, "none") };
 
   const terminal = spawnSync(
     process.execPath,
@@ -372,7 +380,7 @@ test("watch --agents shows multi-agent coordination risks", () => {
   fs.writeFileSync(path.join(sessionDir, "agent-one.jsonl"), makeSession("agent-one", "01"), "utf8");
   fs.writeFileSync(path.join(sessionDir, "agent-two.jsonl"), makeSession("agent-two", "03"), "utf8");
 
-  const env = { ...process.env, PRISMO_CODEX_HOME: codexHome, PRISMO_CLAUDE_HOME: path.join(root, "none") };
+  const env = { ...process.env, PRISMO_CODEX_HOME: codexHome, PRISMO_CLAUDE_HOME: path.join(root, "none"), PRISMO_CURSOR_HOME: path.join(root, "none"), PRISMO_CURSOR_APP_SUPPORT: path.join(root, "none") };
   const json = spawnSync(
     process.execPath,
     [path.join(__dirname, "..", "bin", "prismo.js"), "watch", "codex", "--agents", "--once", "--json", "--limit", "2", root],

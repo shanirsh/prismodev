@@ -549,9 +549,49 @@ it only creates new files and recommendations. you decide what to apply.
 
 ---
 
+## cursor session tracking
+
+prismodev now reads cursor's local sqlite databases directly. cursor stores data differently from claude code and codex, no jsonl session logs, but it has its own tracking databases with unique data.
+
+```bash
+npx getprismo cursor                     # summary of all cursor sessions
+npx getprismo cursor list                # list composer sessions with modes and models
+npx getprismo cursor authorship          # ai vs human code authorship from scored commits
+npx getprismo cursor timeline            # timeline of ai activity across commits and files
+npx getprismo cursor files               # ai-generated and ai-deleted file tracking
+npx getprismo cursor --json              # machine-readable output
+```
+
+cursor tracks something claude code and codex can't: per-commit ai authorship. every commit is scored with how many lines came from composer (agent), tab completions, and human typing. prismodev surfaces this as an authorship percentage.
+
+```
+AI Authorship (from Cursor scored commits)
+
+Commits analyzed: 47
+Total lines added: 3812
+
+  Composer (agent):  2104 lines
+  Tab completions:   891 lines
+  Human:             817 lines
+--------------------------------------------------
+  AI authorship:     78%
+```
+
+prismodev also tracks ai-generated files cursor is watching, files cursor deleted, conversation summaries, and model usage distribution across sessions.
+
+what cursor can't do vs claude code: cursor doesn't expose per-message token counts, exact api costs, or full conversation transcripts in its local data. that means live context pressure, loop detection, exact cost breakdowns, cache savings analysis, and shield don't apply the same way. this is a cursor limitation. prismodev gets about 60-65% feature parity with cursor compared to claude code/codex.
+
+what cursor gives you that the others don't: ai authorship percentages per commit, tab vs composer vs human line counts, conversation summaries with tldr, and ai-generated file tracking with churn detection.
+
+the `prismo_cursor_sessions` mcp tool exposes all of this to compatible agents.
+
+`scan` and `doctor` now detect cursor's tracking database automatically and flag ai-generated files still present in the repo.
+
+---
+
 ## how watch catches waste live
 
-watch reads local session logs from codex and claude code. it detects:
+watch reads local session logs from codex, claude code, and cursor. it detects:
 
 | signal | what it means |
 |--------|--------------|
@@ -627,6 +667,7 @@ no install needed. npx runs it directly.
 | `watch` | live session monitoring with warnings |
 | `cc` | claude code cost breakdown |
 | `cc timeline` | session reconstruction with events |
+| `cursor` | cursor session tracking and ai authorship |
 | `scan --usage` | full repo scan with local usage data |
 | `scan --optimizer-fit` | recommend which token-optimization path fits your repo/session |
 | `scan --report-card` | shortest decision-layer summary |
@@ -681,6 +722,7 @@ npx getprismo watch --rescue --json      # include rescuePrompt in JSON
 npx getprismo watch --once --redact-paths # hide local paths
 npx getprismo watch codex                # only codex sessions
 npx getprismo watch claude               # only claude code sessions
+npx getprismo watch cursor               # only cursor sessions
 ```
 
 ### shield mode
@@ -712,6 +754,7 @@ npx getprismo mcp /path/to/repo
 - `prismo_context_pack`
 - `prismo_firewall`
 - `prismo_cc_timeline`
+- `prismo_cursor_sessions`
 
 This lets an MCP-compatible agent search prior shielded test/build output, request scoped context packs, inspect token-waste signals, or coordinate multiple local agents without pasting giant logs into the conversation.
 
@@ -806,9 +849,10 @@ local logs        exact when codex/claude session logs expose token fields
 prismo proxy      exact usage/cost when traffic routes through prismo base url
 ```
 
-prismodev reads local session logs from:
+prismodev reads local session data from:
 - codex: `~/.codex/sessions/**/*.jsonl`
 - claude code: `~/.claude/projects/**/*.jsonl`
+- cursor: `~/.cursor/ai-tracking/ai-code-tracking.db` and `~/Library/Application Support/Cursor/User/globalStorage/state.vscdb`
 
 no api keys. no intercepted prompts. no data uploaded.
 
@@ -894,7 +938,8 @@ lib/prismo-dev/scan-path-utils.js scan ignore/path helper logic
 lib/prismo-dev/shield.js         local command shield and searchable output index
 lib/prismo-dev/usage-cost.js     Claude Code cost and timeline analysis
 lib/prismo-dev/usage-log-utils.js local session log parsing helpers
-lib/prismo-dev/usage-sessions.js local Codex/Claude session discovery
+lib/prismo-dev/cursor-sessions.js Cursor SQLite session and authorship tracking
+lib/prismo-dev/usage-sessions.js local Codex/Claude/Cursor session discovery
 lib/prismo-dev/usage-watch.js    watch orchestration, JSON payloads, live files
 lib/prismo-dev/utils.js          shared terminal/file/token helpers
 lib/prismo-dev/watch-live.js     live context-pressure decisions
@@ -914,6 +959,7 @@ npx getprismo shield --help
 npx getprismo mcp --help
 npx getprismo mcp doctor
 npx getprismo cc --help
+npx getprismo cursor --help
 npx getprismo scan --help
 ```
 

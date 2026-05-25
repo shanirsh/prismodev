@@ -295,7 +295,7 @@ test("scan --optimizer-fit recommends the right optimization path", () => {
     JSON.stringify({ type: "event_msg", timestamp: "2026-05-24T10:01:00Z", payload: { type: "tool_result", content: "logs/debug.log dist/bundle.js package-lock.json\n".repeat(1000) } }),
   ].join("\n"), "utf8");
 
-  const env = { ...process.env, PRISMO_CODEX_HOME: codexHome, PRISMO_CLAUDE_HOME: path.join(root, "none") };
+  const env = { ...process.env, PRISMO_CODEX_HOME: codexHome, PRISMO_CLAUDE_HOME: path.join(root, "none"), PRISMO_CURSOR_HOME: path.join(root, "none"), PRISMO_CURSOR_APP_SUPPORT: path.join(root, "none") };
   const terminal = spawnSync(
     process.execPath,
     [path.join(__dirname, "..", "bin", "prismo.js"), "scan", "--optimizer-fit", "--limit", "1", root],
@@ -345,7 +345,7 @@ test("scan --usage folds exact local session usage into diagnostics", () => {
   const result = spawnSync(
     process.execPath,
     [path.join(__dirname, "..", "bin", "prismo.js"), "scan", "--usage", "--json", "--no-report", "--limit", "1", root],
-    { encoding: "utf8", env: { ...process.env, PRISMO_CODEX_HOME: codexHome, PRISMO_CLAUDE_HOME: path.join(root, "none") } }
+    { encoding: "utf8", env: { ...process.env, PRISMO_CODEX_HOME: codexHome, PRISMO_CLAUDE_HOME: path.join(root, "none"), PRISMO_CURSOR_HOME: path.join(root, "none"), PRISMO_CURSOR_APP_SUPPORT: path.join(root, "none") } }
   );
 
   assert.equal(result.status, 0, result.stderr);
@@ -384,7 +384,7 @@ test("scan --usage turns session context leaks into ignore suggestions", () => {
     }),
   ].join("\n"), "utf8");
 
-  const env = { ...process.env, PRISMO_CODEX_HOME: codexHome, PRISMO_CLAUDE_HOME: path.join(root, "none") };
+  const env = { ...process.env, PRISMO_CODEX_HOME: codexHome, PRISMO_CLAUDE_HOME: path.join(root, "none"), PRISMO_CURSOR_HOME: path.join(root, "none"), PRISMO_CURSOR_APP_SUPPORT: path.join(root, "none") };
   const result = spawnSync(
     process.execPath,
     [path.join(__dirname, "..", "bin", "prismo.js"), "scan", "--usage", "--json", "--no-report", "--limit", "1", root],
