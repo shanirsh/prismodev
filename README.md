@@ -1,5 +1,9 @@
 # prismodev
 
+[![npm version](https://img.shields.io/npm/v/getprismo.svg)](https://www.npmjs.com/package/getprismo)
+[![npm downloads](https://img.shields.io/npm/dw/getprismo.svg)](https://www.npmjs.com/package/getprismo)
+[![license: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
 local ai coding cost control. one command to diagnose token waste, fix it, and prove the improvement.
 
 ```bash
