@@ -49,6 +49,7 @@ For local development from this repo:
 - `prismo_scan`: scan repo context/token waste
 - `prismo_doctor_dry_run`: preview doctor payoff without writing files
 - `prismo_watch_snapshot`: inspect live context pressure
+- `prismo_multi_agent_watch`: inspect coordination risks across parallel local agents
 - `prismo_shield_run`: run a noisy command and store full output locally
 - `prismo_shield_search`: search stored shield output
 - `prismo_shield_last`: list recent shielded command runs

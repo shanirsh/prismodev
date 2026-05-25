@@ -235,6 +235,7 @@ test("mcp server initializes and lists Prismo tools", () => {
   assert.equal(lines[0].result.serverInfo.name, "prismodev");
   const toolNames = lines[1].result.tools.map((tool) => tool.name);
   assert.ok(toolNames.includes("prismo_scan"));
+  assert.ok(toolNames.includes("prismo_multi_agent_watch"));
   assert.ok(toolNames.includes("prismo_shield_search"));
   assert.ok(toolNames.includes("prismo_cc_timeline"));
 });
@@ -251,7 +252,7 @@ test("mcp doctor validates tools and prints config", () => {
   const payload = JSON.parse(result.stdout);
   assert.equal(payload.ok, true);
   assert.equal(payload.server.name, "prismodev");
-  assert.equal(payload.tools.count, 9);
+  assert.equal(payload.tools.count, 10);
   assert.equal(payload.tools.hasShield, true);
   assert.equal(payload.smoke.scan.ok, true);
   assert.deepEqual(payload.config.mcpServers.prismodev.args.slice(0, 3), ["-y", "getprismo", "mcp"]);

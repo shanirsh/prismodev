@@ -693,6 +693,7 @@ npx getprismo mcp /path/to/repo
 - `prismo_scan`
 - `prismo_doctor_dry_run`
 - `prismo_watch_snapshot`
+- `prismo_multi_agent_watch`
 - `prismo_shield_run`
 - `prismo_shield_search`
 - `prismo_shield_last`
@@ -700,7 +701,7 @@ npx getprismo mcp /path/to/repo
 - `prismo_firewall`
 - `prismo_cc_timeline`
 
-This lets an MCP-compatible agent search prior shielded test/build output, request scoped context packs, or inspect token-waste signals without pasting giant logs into the conversation.
+This lets an MCP-compatible agent search prior shielded test/build output, request scoped context packs, inspect token-waste signals, or coordinate multiple local agents without pasting giant logs into the conversation.
 
 Generic MCP client config:
 
