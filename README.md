@@ -492,6 +492,14 @@ Run npx getprismo optimize, then start from .prismo/architecture-summary.md.
 
 timeline shows exactly what leaked, what repeated, and what to do differently next time.
 
+to turn a postmortem into a safer next-session policy, run:
+
+```bash
+npx getprismo cc timeline --firewall --task auth-bug
+```
+
+this writes `.prismo/timeline-firewall-suggestions.md`, `.prismo/context-firewall.suggested.md`, `.prismo/allowed-context.suggested.txt`, and `.prismo/blocked-context.suggested.txt` from the latest session evidence. it does not overwrite your active firewall; it gives you a per-task allow/block recommendation for the next session.
+
 ---
 
 ## how doctor improves a repo
@@ -736,6 +744,7 @@ For local development from this repo:
 ```bash
 npx getprismo cc                         # latest session cost
 npx getprismo cc timeline                # event timeline for latest session
+npx getprismo cc timeline --firewall --task auth-bug # suggest next-session firewall rules
 npx getprismo cc list                    # list recent sessions
 npx getprismo cc last 5                  # last 5 sessions
 npx getprismo cc all                     # everything

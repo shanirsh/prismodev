@@ -60,7 +60,7 @@ test("usage summary reads exact Claude Code message usage from local JSONL", () 
           cache_read_input_tokens: 30,
           output_tokens: 40,
         },
-        content: [{ type: "text", text: "done" }],
+        content: [{ type: "text", text: "done\npackage-lock.json\nlogs/debug.log\nbackend/app/auth/security.py\n" }],
       },
     }),
   ].join("\n"), "utf8");
@@ -86,6 +86,11 @@ test("usage summary reads exact Claude Code message usage from local JSONL", () 
 test("cc command reports Claude Code token costs and cache savings", () => {
   const root = tempRepo();
   const claudeHome = tempRepo();
+  fs.mkdirSync(path.join(root, "logs"), { recursive: true });
+  fs.mkdirSync(path.join(root, "backend", "app", "auth"), { recursive: true });
+  fs.writeFileSync(path.join(root, "package-lock.json"), "{}", "utf8");
+  fs.writeFileSync(path.join(root, "logs", "debug.log"), "debug", "utf8");
+  fs.writeFileSync(path.join(root, "backend", "app", "auth", "security.py"), "def auth(): pass\n", "utf8");
   const safeProject = root.replace(/[\/\\:]/g, "-").replace(/^-/, "-");
   const projectDir = path.join(claudeHome, "projects", safeProject);
   fs.mkdirSync(projectDir, { recursive: true });
@@ -151,6 +156,19 @@ test("cc command reports Claude Code token costs and cache savings", () => {
   assert.equal(timelinePayload.command, "cc timeline");
   assert.equal(timelinePayload.session.model, "claude-sonnet-4-20250514");
   assert.ok(Array.isArray(timelinePayload.timeline));
+
+  const firewall = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "cc", "timeline", "--firewall", "--task", "auth-bug", "--json", root],
+    { encoding: "utf8", env }
+  );
+  assert.equal(firewall.status, 0, firewall.stderr);
+  const firewallPayload = JSON.parse(firewall.stdout);
+  assert.equal(firewallPayload.firewallSuggestions.scope, "auth");
+  assert.ok(firewallPayload.firewallSuggestions.generatedFiles.includes(".prismo/timeline-firewall-suggestions.md"));
+  assert.ok(firewallPayload.firewallSuggestions.blocked.some((item) => item.includes("package-lock.json") || item.includes("logs")));
+  assert.ok(fs.existsSync(path.join(root, ".prismo", "timeline-firewall-suggestions.md")));
+  assert.ok(fs.existsSync(path.join(root, ".prismo", "context-firewall.suggested.md")));
 });
 
 test("usage terminal output and watch --once --json are script-friendly", () => {
