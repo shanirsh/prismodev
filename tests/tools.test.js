@@ -71,11 +71,15 @@ test("command-specific help and demo mode are available", () => {
   assert.ok(demo.stdout.includes("Try it on your repo"));
 });
 
-test("instructions audit scores duplicated and ineffective persistent rules", () => {
+test("instructions audit separates observable violations, partial compliance, and influence-unknown rules", () => {
   const root = tempRepo();
   const codexHome = tempRepo();
+  fs.mkdirSync(path.join(root, "src", "api"), { recursive: true });
+  fs.writeFileSync(path.join(root, "src", "schema.ts"), "export const user = {}\n", "utf8");
+  fs.writeFileSync(path.join(root, "src", "api", "routes.ts"), "export const routes = []\n", "utf8");
   fs.writeFileSync(path.join(root, "CLAUDE.md"), [
     "- Do not read package-lock.json or generated dist artifacts.",
+    "- Always read src/schema.ts before editing src/api/routes.ts.",
     "- Keep changes small and focused.",
     "- Keep changes small and focused.",
     "- This project values excellence and quality in all work.",
@@ -89,6 +93,10 @@ test("instructions audit scores duplicated and ineffective persistent rules", ()
   fs.writeFileSync(path.join(sessionDir, "instructions.jsonl"), [
     JSON.stringify({ type: "event_msg", timestamp: "2026-05-26T10:00:00Z", payload: { type: "session_meta", id: "instructions-test", cwd: root, model: "gpt-test" } }),
     JSON.stringify({ type: "event_msg", timestamp: "2026-05-26T10:01:00Z", payload: { type: "tool_result", content: "package-lock.json\ndist/app.js\nlogs/debug.log\nnpm test failed\n".repeat(12000) } }),
+    JSON.stringify({ type: "event_msg", timestamp: "2026-05-26T10:02:00Z", payload: { type: "tool_result", content: "read src/schema.ts before edit src/api/routes.ts\nERROR route tests failed\n" } }),
+    JSON.stringify({ type: "event_msg", timestamp: "2026-05-26T10:03:00Z", payload: { type: "tool_result", content: "read src/schema.ts before edit src/api/routes.ts\nERROR route tests failed\n" } }),
+    JSON.stringify({ type: "event_msg", timestamp: "2026-05-26T10:04:00Z", payload: { type: "tool_result", content: "read src/schema.ts before edit src/api/routes.ts\nERROR route tests failed\n" } }),
+    JSON.stringify({ type: "event_msg", timestamp: "2026-05-26T10:05:00Z", payload: { type: "tool_result", content: "read src/schema.ts before edit src/api/routes.ts\nERROR route tests failed\n" } }),
   ].join("\n"), "utf8");
   const env = { ...process.env, PRISMO_CODEX_HOME: codexHome, PRISMO_CLAUDE_HOME: path.join(root, "none"), PRISMO_CURSOR_HOME: path.join(root, "none"), PRISMO_CURSOR_APP_SUPPORT: path.join(root, "none") };
 
@@ -103,8 +111,10 @@ test("instructions audit scores duplicated and ineffective persistent rules", ()
   assert.equal(payload.files.length, 2);
   assert.ok(payload.summary.totalRules >= 5);
   assert.ok(payload.summary.duplicatedRules >= 2);
-  assert.ok(payload.deadWeight.some((rule) => rule.status === "ignored-or-ineffective"));
-  assert.ok(payload.deadWeight.some((rule) => rule.status === "duplicate"));
+  assert.ok(payload.prunable.some((rule) => rule.status === "observably-violated"));
+  assert.ok(payload.prunable.some((rule) => rule.status === "duplicate"));
+  assert.ok(payload.partialCompliance.some((rule) => rule.status === "partial-compliance"));
+  assert.ok(payload.influenceUnknown.some((rule) => rule.status === "influence-unknown"));
 
   const terminal = spawnSync(
     process.execPath,
@@ -113,7 +123,9 @@ test("instructions audit scores duplicated and ineffective persistent rules", ()
   );
   assert.equal(terminal.status, 0, terminal.stderr);
   assert.ok(terminal.stdout.includes("Prismo Instruction ROI Audit"));
-  assert.ok(terminal.stdout.includes("Dead Weight"));
+  assert.ok(terminal.stdout.includes("Safely Prunable"));
+  assert.ok(terminal.stdout.includes("Partial Compliance"));
+  assert.ok(terminal.stdout.includes("Influence Unknown"));
 });
 
 test("firewall generates scoped context policy files", () => {

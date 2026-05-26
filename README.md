@@ -719,7 +719,7 @@ no install needed. npx runs it directly.
 | `receipt` | run receipt for reads, repeats, output, artifacts, likely influence, and next-run scope |
 | `replay` | incident replay with root cause and recovery prompt |
 | `timeline` | recurring context-waste patterns across recent sessions |
-| `instructions audit` | instruction ROI audit for CLAUDE.md / AGENTS.md dead-weight rules |
+| `instructions audit` | instruction ROI audit for CLAUDE.md / AGENTS.md violations, partial compliance, duplicates, and influence-unknown rules |
 | `boundaries` | multi-agent boundary check for shared files/artifacts and worktree overlap |
 | `scan --usage` | full repo scan with local usage data |
 | `scan --optimizer-fit` | recommend which token-optimization path fits your repo/session |
