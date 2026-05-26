@@ -71,6 +71,51 @@ test("command-specific help and demo mode are available", () => {
   assert.ok(demo.stdout.includes("Try it on your repo"));
 });
 
+test("instructions audit scores duplicated and ineffective persistent rules", () => {
+  const root = tempRepo();
+  const codexHome = tempRepo();
+  fs.writeFileSync(path.join(root, "CLAUDE.md"), [
+    "- Do not read package-lock.json or generated dist artifacts.",
+    "- Keep changes small and focused.",
+    "- Keep changes small and focused.",
+    "- This project values excellence and quality in all work.",
+  ].join("\n"), "utf8");
+  fs.writeFileSync(path.join(root, "AGENTS.md"), [
+    "- Do not read package-lock.json or generated dist artifacts.",
+    "- Use shield for noisy command output.",
+  ].join("\n"), "utf8");
+  const sessionDir = path.join(codexHome, "sessions", "2026", "05", "26");
+  fs.mkdirSync(sessionDir, { recursive: true });
+  fs.writeFileSync(path.join(sessionDir, "instructions.jsonl"), [
+    JSON.stringify({ type: "event_msg", timestamp: "2026-05-26T10:00:00Z", payload: { type: "session_meta", id: "instructions-test", cwd: root, model: "gpt-test" } }),
+    JSON.stringify({ type: "event_msg", timestamp: "2026-05-26T10:01:00Z", payload: { type: "tool_result", content: "package-lock.json\ndist/app.js\nlogs/debug.log\nnpm test failed\n".repeat(12000) } }),
+  ].join("\n"), "utf8");
+  const env = { ...process.env, PRISMO_CODEX_HOME: codexHome, PRISMO_CLAUDE_HOME: path.join(root, "none"), PRISMO_CURSOR_HOME: path.join(root, "none"), PRISMO_CURSOR_APP_SUPPORT: path.join(root, "none") };
+
+  const json = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "instructions", "audit", "--json", "--limit", "1", root],
+    { encoding: "utf8", env }
+  );
+  assert.equal(json.status, 0, json.stderr);
+  const payload = JSON.parse(json.stdout);
+  assert.equal(payload.command, "instructions audit");
+  assert.equal(payload.files.length, 2);
+  assert.ok(payload.summary.totalRules >= 5);
+  assert.ok(payload.summary.duplicatedRules >= 2);
+  assert.ok(payload.deadWeight.some((rule) => rule.status === "ignored-or-ineffective"));
+  assert.ok(payload.deadWeight.some((rule) => rule.status === "duplicate"));
+
+  const terminal = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "instructions", "audit", "--limit", "1", root],
+    { encoding: "utf8", env }
+  );
+  assert.equal(terminal.status, 0, terminal.stderr);
+  assert.ok(terminal.stdout.includes("Prismo Instruction ROI Audit"));
+  assert.ok(terminal.stdout.includes("Dead Weight"));
+});
+
 test("firewall generates scoped context policy files", () => {
   const root = tempRepo();
   fs.mkdirSync(path.join(root, "backend", "app", "auth"), { recursive: true });
@@ -238,6 +283,9 @@ test("mcp server initializes and lists Prismo tools", () => {
   assert.ok(toolNames.includes("prismo_multi_agent_watch"));
   assert.ok(toolNames.includes("prismo_shield_search"));
   assert.ok(toolNames.includes("prismo_cc_timeline"));
+  assert.ok(toolNames.includes("prismo_receipt"));
+  assert.ok(toolNames.includes("prismo_replay"));
+  assert.ok(toolNames.includes("prismo_boundaries"));
 });
 
 test("mcp doctor validates tools and prints config", () => {
@@ -252,7 +300,7 @@ test("mcp doctor validates tools and prints config", () => {
   const payload = JSON.parse(result.stdout);
   assert.equal(payload.ok, true);
   assert.equal(payload.server.name, "prismodev");
-  assert.equal(payload.tools.count, 11);
+  assert.equal(payload.tools.count, 16);
   assert.equal(payload.tools.hasShield, true);
   assert.equal(payload.smoke.scan.ok, true);
   assert.deepEqual(payload.config.mcpServers.prismodev.args.slice(0, 3), ["-y", "getprismo", "mcp"]);

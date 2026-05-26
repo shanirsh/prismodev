@@ -356,6 +356,153 @@ test("usage terminal output and watch --once --json are script-friendly", () => 
   assert.ok(fs.readFileSync(path.join(root, ".prismo", "watch-report.md"), "utf8").includes("Prismo Watch Report"));
 });
 
+test("receipt command explains repeated reads, output floods, artifacts, and next-run actions", () => {
+  const root = tempRepo();
+  const codexHome = tempRepo();
+  const sessionDir = path.join(codexHome, "sessions", "2026", "05", "26");
+  fs.mkdirSync(sessionDir, { recursive: true });
+  fs.mkdirSync(path.join(root, "src", "auth"), { recursive: true });
+  fs.writeFileSync(path.join(root, "src", "auth", "session.ts"), "export const session = true;\n", "utf8");
+  const noisyOutput = [
+    "npm test failed in src/auth/session.ts\n",
+    "src/auth/session.ts\n".repeat(12),
+    "package-lock.json\n".repeat(8),
+    "dist/app.js\n".repeat(6),
+    "ERROR: AUTH_FAILURE expected 200 received 401\n",
+  ].join("").repeat(1000);
+  fs.writeFileSync(path.join(sessionDir, "receipt.jsonl"), [
+    JSON.stringify({ type: "event_msg", timestamp: "2026-05-26T10:00:00Z", payload: { type: "session_meta", id: "receipt-test", cwd: root, model: "gpt-test" } }),
+    JSON.stringify({ type: "event_msg", timestamp: "2026-05-26T10:01:00Z", payload: { type: "response", role: "assistant", content: [{ type: "tool_use", name: "shell", input: "npm test" }] } }),
+    JSON.stringify({ type: "event_msg", timestamp: "2026-05-26T10:02:00Z", payload: { type: "tool_result", content: noisyOutput } }),
+    JSON.stringify({ type: "event_msg", timestamp: "2026-05-26T10:03:00Z", payload: { type: "response", role: "assistant", content: [{ type: "tool_use", name: "shell", input: "npm test" }] } }),
+    JSON.stringify({ type: "event_msg", timestamp: "2026-05-26T10:04:00Z", payload: { type: "tool_result", content: noisyOutput } }),
+    JSON.stringify({ type: "event_msg", timestamp: "2026-05-26T10:05:00Z", payload: { type: "response", role: "assistant", content: [{ type: "tool_use", name: "shell", input: "npm test" }] } }),
+    JSON.stringify({ type: "event_msg", timestamp: "2026-05-26T10:06:00Z", payload: { type: "tool_result", content: noisyOutput } }),
+    JSON.stringify({ type: "event_msg", timestamp: "2026-05-26T10:07:00Z", payload: { type: "tool_result", content: noisyOutput } }),
+  ].join("\n"), "utf8");
+  const env = { ...process.env, PRISMO_CODEX_HOME: codexHome, PRISMO_CLAUDE_HOME: path.join(root, "none"), PRISMO_CURSOR_HOME: path.join(root, "none"), PRISMO_CURSOR_APP_SUPPORT: path.join(root, "none") };
+
+  const json = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "receipt", "codex", "--json", "--limit", "1", root],
+    { encoding: "utf8", env }
+  );
+  assert.equal(json.status, 0, json.stderr);
+  const payload = JSON.parse(json.stdout);
+  assert.equal(payload.schemaVersion, 1);
+  assert.equal(payload.command, "receipt");
+  assert.equal(payload.primary.sessionId, "receipt-test");
+  assert.equal(payload.primary.rootCause.cause, "tool-output-flood");
+  assert.ok(payload.primary.readReceipt.repeatedReads.some((item) => item.value.includes("src/auth/session.ts")));
+  assert.ok(payload.primary.artifactReceipt.artifactGroups.some((item) => item.type === "lockfiles"));
+  assert.ok(payload.primary.outputReceipt.toolOutputTokens > 75000);
+  assert.ok(payload.primary.nextRun.some((item) => item.includes("shield")));
+
+  const terminal = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "receipt", "codex", "--limit", "1", root],
+    { encoding: "utf8", env }
+  );
+  assert.equal(terminal.status, 0, terminal.stderr);
+  assert.ok(terminal.stdout.includes("Prismo Run Receipt"));
+  assert.ok(terminal.stdout.includes("Root Cause"));
+  assert.ok(terminal.stdout.includes("Read Receipt"));
+  assert.ok(terminal.stdout.includes("Next Run"));
+});
+
+test("timeline command aggregates recurring waste across recent sessions", () => {
+  const root = tempRepo();
+  const codexHome = tempRepo();
+  const sessionDir = path.join(codexHome, "sessions", "2026", "05", "26");
+  fs.mkdirSync(sessionDir, { recursive: true });
+  fs.mkdirSync(path.join(root, "src", "auth"), { recursive: true });
+  fs.writeFileSync(path.join(root, "src", "auth", "session.ts"), "export const session = true;\n", "utf8");
+  const output = [
+    "src/auth/session.ts\n".repeat(8),
+    "package-lock.json\n".repeat(4),
+    "dist/app.js\n".repeat(4),
+    "npm test failed\n",
+  ].join("").repeat(1500);
+  for (const id of ["timeline-a", "timeline-b"]) {
+    fs.writeFileSync(path.join(sessionDir, `${id}.jsonl`), [
+      JSON.stringify({ type: "event_msg", timestamp: "2026-05-26T10:00:00Z", payload: { type: "session_meta", id, cwd: root, model: "gpt-test" } }),
+      JSON.stringify({ type: "event_msg", timestamp: "2026-05-26T10:01:00Z", payload: { type: "tool_result", content: output } }),
+      JSON.stringify({ type: "event_msg", timestamp: "2026-05-26T10:02:00Z", payload: { type: "tool_result", content: output } }),
+      JSON.stringify({ type: "event_msg", timestamp: "2026-05-26T10:03:00Z", payload: { type: "tool_result", content: output } }),
+      JSON.stringify({ type: "event_msg", timestamp: "2026-05-26T10:04:00Z", payload: { type: "tool_result", content: output } }),
+    ].join("\n"), "utf8");
+  }
+  const env = { ...process.env, PRISMO_CODEX_HOME: codexHome, PRISMO_CLAUDE_HOME: path.join(root, "none"), PRISMO_CURSOR_HOME: path.join(root, "none"), PRISMO_CURSOR_APP_SUPPORT: path.join(root, "none") };
+
+  const json = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "timeline", "codex", "--json", "--last", "2", root],
+    { encoding: "utf8", env }
+  );
+  assert.equal(json.status, 0, json.stderr);
+  const payload = JSON.parse(json.stdout);
+  assert.equal(payload.command, "timeline");
+  assert.equal(payload.sessionsAnalyzed, 2);
+  assert.ok(payload.repeatedArtifacts.some((item) => item.value === "lockfiles" && item.sessions === 2));
+  assert.ok(payload.repeatedFiles.some((item) => item.value.includes("src/auth/session.ts") && item.sessions === 2));
+  assert.equal(payload.summary.toolFloodSessions, 2);
+  assert.ok(payload.recommendations.some((item) => item.includes("shield")));
+
+  const terminal = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "timeline", "codex", "--last", "2", root],
+    { encoding: "utf8", env }
+  );
+  assert.equal(terminal.status, 0, terminal.stderr);
+  assert.ok(terminal.stdout.includes("Prismo Multi-Session Timeline"));
+  assert.ok(terminal.stdout.includes("Recurring Artifacts"));
+});
+
+test("replay command reconstructs an incident and prints a recovery prompt", () => {
+  const root = tempRepo();
+  const codexHome = tempRepo();
+  const sessionDir = path.join(codexHome, "sessions", "2026", "05", "26");
+  fs.mkdirSync(sessionDir, { recursive: true });
+  fs.mkdirSync(path.join(root, "src", "auth"), { recursive: true });
+  fs.writeFileSync(path.join(root, "src", "auth", "session.ts"), "export const session = true;\n", "utf8");
+  const output = [
+    "src/auth/session.ts\n".repeat(10),
+    "package-lock.json\n".repeat(5),
+    "dist/app.js\n".repeat(5),
+    "npm test failed\n",
+  ].join("").repeat(1200);
+  fs.writeFileSync(path.join(sessionDir, "replay.jsonl"), [
+    JSON.stringify({ type: "event_msg", timestamp: "2026-05-26T10:00:00Z", payload: { type: "session_meta", id: "replay-test", cwd: root, model: "gpt-test" } }),
+    JSON.stringify({ type: "event_msg", timestamp: "2026-05-26T10:01:00Z", payload: { type: "tool_result", content: output } }),
+    JSON.stringify({ type: "event_msg", timestamp: "2026-05-26T10:02:00Z", payload: { type: "tool_result", content: output } }),
+    JSON.stringify({ type: "event_msg", timestamp: "2026-05-26T10:03:00Z", payload: { type: "tool_result", content: output } }),
+    JSON.stringify({ type: "event_msg", timestamp: "2026-05-26T10:04:00Z", payload: { type: "tool_result", content: output } }),
+  ].join("\n"), "utf8");
+  const env = { ...process.env, PRISMO_CODEX_HOME: codexHome, PRISMO_CLAUDE_HOME: path.join(root, "none"), PRISMO_CURSOR_HOME: path.join(root, "none"), PRISMO_CURSOR_APP_SUPPORT: path.join(root, "none") };
+
+  const json = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "replay", "codex", "--json", "--limit", "1", root],
+    { encoding: "utf8", env }
+  );
+  assert.equal(json.status, 0, json.stderr);
+  const payload = JSON.parse(json.stdout);
+  assert.equal(payload.command, "replay");
+  assert.equal(payload.incident.type, "tool-output-spiral");
+  assert.ok(payload.sequence.some((event) => event.type === "tool-output"));
+  assert.ok(payload.recoveryPrompt.includes("Before editing anything else"));
+  assert.ok(payload.recoveryPrompt.includes("shield"));
+
+  const terminal = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "replay", "codex", "--limit", "1", root],
+    { encoding: "utf8", env }
+  );
+  assert.equal(terminal.status, 0, terminal.stderr);
+  assert.ok(terminal.stdout.includes("Prismo Incident Replay"));
+  assert.ok(terminal.stdout.includes("Recovery Prompt"));
+});
+
 test("watch --agents shows multi-agent coordination risks", () => {
   const root = tempRepo();
   const codexHome = tempRepo();
@@ -436,4 +583,26 @@ test("watch --agents shows multi-agent coordination risks", () => {
   assert.ok(terminal.stdout.includes("Coordination Warnings"));
   assert.ok(terminal.stdout.includes("Shared Repeated Files"));
   assert.ok(terminal.stdout.includes("src/shared.js"));
+
+  const boundaries = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "boundaries", "codex", "--json", "--limit", "2", root],
+    { encoding: "utf8", env }
+  );
+  assert.equal(boundaries.status, 0, boundaries.stderr);
+  const boundaryPayload = JSON.parse(boundaries.stdout);
+  assert.equal(boundaryPayload.command, "boundaries");
+  assert.equal(boundaryPayload.agentCount, 2);
+  assert.ok(boundaryPayload.sharedFiles.some((item) => item.path === "src/shared.js"));
+  assert.ok(boundaryPayload.sharedArtifacts.some((item) => item.type === "lockfiles"));
+  assert.ok(boundaryPayload.recommendations.some((item) => item.includes("worktrees") || item.includes("file ownership")));
+
+  const boundaryTerminal = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "boundaries", "codex", "--limit", "2", root],
+    { encoding: "utf8", env }
+  );
+  assert.equal(boundaryTerminal.status, 0, boundaryTerminal.stderr);
+  assert.ok(boundaryTerminal.stdout.includes("Prismo Agent Boundary Check"));
+  assert.ok(boundaryTerminal.stdout.includes("Shared Files"));
 });

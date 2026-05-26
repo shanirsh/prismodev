@@ -32,13 +32,15 @@ prismodev covers the full AI coding session:
 before you code     npx getprismo doctor
 while you code      npx getprismo watch
 noisy commands      npx getprismo shield -- npm test
-after you code      npx getprismo cc timeline
+after you code      npx getprismo receipt
+postmortem          npx getprismo replay
 agent-native        npx getprismo mcp
 ```
 
 **doctor** diagnoses the repo, applies safe fixes, and shows the before/after score.
 **watch** monitors context pressure live and warns when things go wrong.
-**cc timeline** reconstructs what happened in the session so you learn from it.
+**receipt** explains what repeated, what output dominated, what artifacts leaked, and what likely influenced the run.
+**replay** reconstructs why a session went sideways and prints a recovery prompt.
 **shield** runs noisy commands without dumping full output back into the agent context.
 **mcp** exposes PrismoDev as local tools so compatible agents can scan, search shield output, and request scoped context directly.
 
@@ -589,6 +591,51 @@ the `prismo_cursor_sessions` mcp tool exposes all of this to compatible agents.
 
 ---
 
+## run receipts and incident replay
+
+`receipt` turns recent local sessions into a plain-English run receipt:
+
+```bash
+npx getprismo receipt
+npx getprismo receipt codex --json
+```
+
+it summarizes repeated reads, generated artifacts, tool-output floods, repeated commands, likely influence, and the next scoped action to take.
+
+`replay` is the postmortem view:
+
+```bash
+npx getprismo replay
+```
+
+it classifies the incident pattern, explains what happened, and prints a recovery prompt for the next agent run.
+
+`timeline` looks across many sessions instead of one:
+
+```bash
+npx getprismo timeline --last 20
+```
+
+it surfaces recurring waste patterns such as the same lockfile leaking into many sessions, the same source file being repeatedly reread, or several sessions crossing high context pressure.
+
+`instructions audit` looks at persistent rules:
+
+```bash
+npx getprismo instructions audit
+```
+
+it scores rules in `CLAUDE.md`, `AGENTS.md`, `.codex/AGENTS.md`, `.codex/instructions.md`, and `.openai/instructions.md`, then flags duplicated rules, low-signal rules, trim candidates, and rules that appear ineffective based on recent session evidence.
+
+`boundaries` checks parallel-agent isolation:
+
+```bash
+npx getprismo boundaries
+```
+
+it reports whether visible local agents are overlapping on the same files, leaking the same artifacts, or running noisy sessions that should move into shield or separate worktrees.
+
+---
+
 ## how watch catches waste live
 
 watch reads local session logs from codex, claude code, and cursor. it detects:
@@ -645,7 +692,8 @@ npx getprismo scan --simple
 # the full workflow
 npx getprismo doctor
 npx getprismo watch --once
-npx getprismo cc timeline
+npx getprismo receipt
+npx getprismo replay
 ```
 
 if you don't have node installed, get it from [nodejs.org](https://nodejs.org) (LTS). then:
@@ -668,6 +716,11 @@ no install needed. npx runs it directly.
 | `cc` | claude code cost breakdown |
 | `cc timeline` | session reconstruction with events |
 | `cursor` | cursor session tracking and ai authorship |
+| `receipt` | run receipt for reads, repeats, output, artifacts, likely influence, and next-run scope |
+| `replay` | incident replay with root cause and recovery prompt |
+| `timeline` | recurring context-waste patterns across recent sessions |
+| `instructions audit` | instruction ROI audit for CLAUDE.md / AGENTS.md dead-weight rules |
+| `boundaries` | multi-agent boundary check for shared files/artifacts and worktree overlap |
 | `scan --usage` | full repo scan with local usage data |
 | `scan --optimizer-fit` | recommend which token-optimization path fits your repo/session |
 | `scan --report-card` | shortest decision-layer summary |
@@ -755,6 +808,11 @@ npx getprismo mcp /path/to/repo
 - `prismo_firewall`
 - `prismo_cc_timeline`
 - `prismo_cursor_sessions`
+- `prismo_receipt`
+- `prismo_instructions_audit`
+- `prismo_timeline`
+- `prismo_replay`
+- `prismo_boundaries`
 
 This lets an MCP-compatible agent search prior shielded test/build output, request scoped context packs, inspect token-waste signals, or coordinate multiple local agents without pasting giant logs into the conversation.
 
@@ -929,13 +987,18 @@ then your team can run `npm run ai:doctor` without remembering the full command.
 lib/prismo-dev-scan.js           cli entry and command dispatch
 lib/prismo-dev/constants.js      shared defaults, pricing, patterns
 lib/prismo-dev/context-optimize.js  context packs, scoped prompts
+lib/prismo-dev/boundaries.js     multi-agent boundary and worktree overlap checks
 lib/prismo-dev/doctor.js         doctor/dev/init orchestration
 lib/prismo-dev/fixes.js          safe ignore/template generation
+lib/prismo-dev/instructions.js   instruction ROI and dead-rule analysis
 lib/prismo-dev/mcp.js            local MCP server and Prismo tool bindings
+lib/prismo-dev/receipt.js        run receipts for reads, output, artifacts, and next scope
 lib/prismo-dev/report.js         terminal, markdown, ci reports
+lib/prismo-dev/replay.js         incident replay and recovery prompts
 lib/prismo-dev/scan.js           repo scanning, scoring, readiness
 lib/prismo-dev/scan-path-utils.js scan ignore/path helper logic
 lib/prismo-dev/shield.js         local command shield and searchable output index
+lib/prismo-dev/timeline.js       recurring multi-session waste patterns
 lib/prismo-dev/usage-cost.js     Claude Code cost and timeline analysis
 lib/prismo-dev/usage-log-utils.js local session log parsing helpers
 lib/prismo-dev/cursor-sessions.js Cursor SQLite session and authorship tracking
@@ -960,6 +1023,11 @@ npx getprismo mcp --help
 npx getprismo mcp doctor
 npx getprismo cc --help
 npx getprismo cursor --help
+npx getprismo receipt --help
+npx getprismo replay --help
+npx getprismo timeline --help
+npx getprismo instructions --help
+npx getprismo boundaries --help
 npx getprismo scan --help
 ```
 
