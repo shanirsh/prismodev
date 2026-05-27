@@ -622,9 +622,10 @@ it surfaces recurring waste patterns such as the same lockfile leaking into many
 
 ```bash
 npx getprismo instructions audit
+npx getprismo instructions ablate --dry-run
 ```
 
-it scores rules in `CLAUDE.md`, `AGENTS.md`, `.codex/AGENTS.md`, `.codex/instructions.md`, and `.openai/instructions.md`, then flags duplicated rules, low-signal rules, trim candidates, and rules that appear ineffective based on recent session evidence.
+it scores rules in `CLAUDE.md`, `AGENTS.md`, `.codex/AGENTS.md`, `.codex/instructions.md`, and `.openai/instructions.md`, then separates observable violations, partial compliance, duplicated rules, trim candidates, and influence-unknown rules. `instructions ablate --dry-run` creates a conservative ablation plan with candidates, sample-count guidance, rollback notes, and variance warnings; it does not edit files.
 
 `boundaries` checks parallel-agent isolation:
 
@@ -720,6 +721,7 @@ no install needed. npx runs it directly.
 | `replay` | incident replay with root cause and recovery prompt |
 | `timeline` | recurring context-waste patterns across recent sessions |
 | `instructions audit` | instruction ROI audit for CLAUDE.md / AGENTS.md violations, partial compliance, duplicates, and influence-unknown rules |
+| `instructions ablate --dry-run` | conservative ablation plan for instruction candidates without editing files |
 | `boundaries` | multi-agent boundary check for shared files/artifacts and worktree overlap |
 | `scan --usage` | full repo scan with local usage data |
 | `scan --optimizer-fit` | recommend which token-optimization path fits your repo/session |
@@ -810,6 +812,7 @@ npx getprismo mcp /path/to/repo
 - `prismo_cursor_sessions`
 - `prismo_receipt`
 - `prismo_instructions_audit`
+- `prismo_instructions_ablate`
 - `prismo_timeline`
 - `prismo_replay`
 - `prismo_boundaries`
@@ -990,7 +993,7 @@ lib/prismo-dev/context-optimize.js  context packs, scoped prompts
 lib/prismo-dev/boundaries.js     multi-agent boundary and worktree overlap checks
 lib/prismo-dev/doctor.js         doctor/dev/init orchestration
 lib/prismo-dev/fixes.js          safe ignore/template generation
-lib/prismo-dev/instructions.js   instruction ROI and dead-rule analysis
+lib/prismo-dev/instructions.js   instruction ROI, partial-compliance, and ablation planning
 lib/prismo-dev/mcp.js            local MCP server and Prismo tool bindings
 lib/prismo-dev/receipt.js        run receipts for reads, output, artifacts, and next scope
 lib/prismo-dev/report.js         terminal, markdown, ci reports

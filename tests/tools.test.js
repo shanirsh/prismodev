@@ -116,6 +116,19 @@ test("instructions audit separates observable violations, partial compliance, an
   assert.ok(payload.partialCompliance.some((rule) => rule.status === "partial-compliance"));
   assert.ok(payload.influenceUnknown.some((rule) => rule.status === "influence-unknown"));
 
+  const ablate = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "instructions", "ablate", "--dry-run", "--json", "--samples", "6", "--limit", "20", root],
+    { encoding: "utf8", env }
+  );
+  assert.equal(ablate.status, 0, ablate.stderr);
+  const ablatePayload = JSON.parse(ablate.stdout);
+  assert.equal(ablatePayload.command, "instructions ablate");
+  assert.equal(ablatePayload.dryRun, true);
+  assert.equal(ablatePayload.samples, 6);
+  assert.ok(ablatePayload.candidates.some((rule) => rule.mode === "rewrite-as-acceptance-check"));
+  assert.ok(ablatePayload.protocol.some((line) => line.includes("one instruction candidate")));
+
   const terminal = spawnSync(
     process.execPath,
     [path.join(__dirname, "..", "bin", "prismo.js"), "instructions", "audit", "--limit", "1", root],
@@ -126,6 +139,15 @@ test("instructions audit separates observable violations, partial compliance, an
   assert.ok(terminal.stdout.includes("Safely Prunable"));
   assert.ok(terminal.stdout.includes("Partial Compliance"));
   assert.ok(terminal.stdout.includes("Influence Unknown"));
+
+  const ablateTerminal = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "instructions", "ablate", "--dry-run", "--samples", "6", root],
+    { encoding: "utf8", env }
+  );
+  assert.equal(ablateTerminal.status, 0, ablateTerminal.stderr);
+  assert.ok(ablateTerminal.stdout.includes("Prismo Instruction Ablation Plan"));
+  assert.ok(ablateTerminal.stdout.includes("Mode: dry run"));
 });
 
 test("firewall generates scoped context policy files", () => {
@@ -296,6 +318,7 @@ test("mcp server initializes and lists Prismo tools", () => {
   assert.ok(toolNames.includes("prismo_shield_search"));
   assert.ok(toolNames.includes("prismo_cc_timeline"));
   assert.ok(toolNames.includes("prismo_receipt"));
+  assert.ok(toolNames.includes("prismo_instructions_ablate"));
   assert.ok(toolNames.includes("prismo_replay"));
   assert.ok(toolNames.includes("prismo_boundaries"));
 });
@@ -312,7 +335,7 @@ test("mcp doctor validates tools and prints config", () => {
   const payload = JSON.parse(result.stdout);
   assert.equal(payload.ok, true);
   assert.equal(payload.server.name, "prismodev");
-  assert.equal(payload.tools.count, 16);
+  assert.equal(payload.tools.count, 17);
   assert.equal(payload.tools.hasShield, true);
   assert.equal(payload.smoke.scan.ok, true);
   assert.deepEqual(payload.config.mcpServers.prismodev.args.slice(0, 3), ["-y", "getprismo", "mcp"]);
