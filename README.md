@@ -39,7 +39,7 @@ agent-native        npx getprismo mcp
 
 **doctor** diagnoses the repo, applies safe fixes, and shows the before/after score.
 **watch** monitors context pressure live and warns when things go wrong.
-**receipt** explains what repeated, what output dominated, what artifacts leaked, and what likely influenced the run.
+**receipt** explains what repeated, what output dominated, what artifacts leaked, what likely influenced the run, and a heuristic context-efficiency score.
 **replay** reconstructs why a session went sideways and prints a recovery prompt.
 **shield** runs noisy commands without dumping full output back into the agent context.
 **mcp** exposes PrismoDev as local tools so compatible agents can scan, search shield output, and request scoped context directly.
@@ -600,7 +600,7 @@ npx getprismo receipt
 npx getprismo receipt codex --json
 ```
 
-it summarizes repeated reads, generated artifacts, tool-output floods, repeated commands, likely influence, and the next scoped action to take.
+it summarizes repeated reads, generated artifacts, tool-output floods, repeated commands, likely influence, and the next scoped action to take. it also reports a heuristic context-efficiency metric: decision/progress signals per 1k tokens, with drag factors such as repeated reads, artifact leaks, tool-output floods, and command loops.
 
 `replay` is the postmortem view:
 
@@ -717,7 +717,7 @@ no install needed. npx runs it directly.
 | `cc` | claude code cost breakdown |
 | `cc timeline` | session reconstruction with events |
 | `cursor` | cursor session tracking and ai authorship |
-| `receipt` | run receipt for reads, repeats, output, artifacts, likely influence, and next-run scope |
+| `receipt` | run receipt for reads, repeats, output, artifacts, context efficiency, likely influence, and next-run scope |
 | `replay` | incident replay with root cause and recovery prompt |
 | `timeline` | recurring context-waste patterns across recent sessions |
 | `instructions audit` | instruction ROI audit for CLAUDE.md / AGENTS.md violations, partial compliance, duplicates, and influence-unknown rules |

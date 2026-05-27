@@ -393,6 +393,10 @@ test("receipt command explains repeated reads, output floods, artifacts, and nex
   assert.equal(payload.command, "receipt");
   assert.equal(payload.primary.sessionId, "receipt-test");
   assert.equal(payload.primary.rootCause.cause, "tool-output-flood");
+  assert.ok(payload.primary.contextEfficiency);
+  assert.equal(payload.primary.contextEfficiency.metric, "heuristic decision signals per 1k displayed/context tokens");
+  assert.ok(payload.primary.contextEfficiency.decisionDensityPer1k >= 0);
+  assert.ok(payload.aggregate.contextEfficiency);
   assert.ok(payload.primary.readReceipt.repeatedReads.some((item) => item.value.includes("src/auth/session.ts")));
   assert.ok(payload.primary.artifactReceipt.artifactGroups.some((item) => item.type === "lockfiles"));
   assert.ok(payload.primary.outputReceipt.toolOutputTokens > 75000);
@@ -405,6 +409,7 @@ test("receipt command explains repeated reads, output floods, artifacts, and nex
   );
   assert.equal(terminal.status, 0, terminal.stderr);
   assert.ok(terminal.stdout.includes("Prismo Run Receipt"));
+  assert.ok(terminal.stdout.includes("Context Efficiency"));
   assert.ok(terminal.stdout.includes("Root Cause"));
   assert.ok(terminal.stdout.includes("Read Receipt"));
   assert.ok(terminal.stdout.includes("Next Run"));
