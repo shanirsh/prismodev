@@ -148,6 +148,36 @@ test("instructions audit separates observable violations, partial compliance, an
   assert.equal(ablateTerminal.status, 0, ablateTerminal.stderr);
   assert.ok(ablateTerminal.stdout.includes("Prismo Instruction Ablation Plan"));
   assert.ok(ablateTerminal.stdout.includes("Mode: dry run"));
+
+  const applyDryRun = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "instructions", "apply", "--dry-run", "--json", "--limit", "1", root],
+    { encoding: "utf8", env }
+  );
+  assert.equal(applyDryRun.status, 0, applyDryRun.stderr);
+  const applyPreview = JSON.parse(applyDryRun.stdout);
+  assert.equal(applyPreview.command, "instructions apply");
+  assert.equal(applyPreview.dryRun, true);
+  assert.ok(applyPreview.safeChanges.length >= 2);
+  assert.equal(fs.readFileSync(path.join(root, "CLAUDE.md"), "utf8").includes("Keep changes small and focused.\n- Keep changes small and focused."), true);
+
+  const apply = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "instructions", "apply", "--json", "--limit", "1", root],
+    { encoding: "utf8", env }
+  );
+  assert.equal(apply.status, 0, apply.stderr);
+  const applied = JSON.parse(apply.stdout);
+  assert.equal(applied.dryRun, false);
+  assert.ok(applied.changedFiles.includes("CLAUDE.md"));
+  assert.ok(applied.backups.some((backup) => backup.file === "CLAUDE.md"));
+  assert.equal(fs.existsSync(path.join(root, ".prismo", "instructions-apply-report.md")), true);
+  const claudeText = fs.readFileSync(path.join(root, "CLAUDE.md"), "utf8");
+  const agentsText = fs.readFileSync(path.join(root, "AGENTS.md"), "utf8");
+  assert.equal((claudeText.match(/Keep changes small and focused/g) || []).length, 1);
+  assert.equal(claudeText.includes("Do not read package-lock.json"), true);
+  assert.equal(agentsText.includes("Use shield for noisy command output."), true);
+  assert.equal(agentsText.includes("Do not read package-lock.json"), false);
 });
 
 test("firewall generates scoped context policy files", () => {

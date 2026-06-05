@@ -623,9 +623,10 @@ it surfaces recurring waste patterns such as the same lockfile leaking into many
 ```bash
 npx getprismo instructions audit
 npx getprismo instructions ablate --dry-run
+npx getprismo instructions apply --dry-run
 ```
 
-it scores rules in `CLAUDE.md`, `AGENTS.md`, `.codex/AGENTS.md`, `.codex/instructions.md`, and `.openai/instructions.md`, then separates observable violations, partial compliance, duplicated rules, trim candidates, and influence-unknown rules. `instructions ablate --dry-run` creates a conservative ablation plan with candidates, sample-count guidance, rollback notes, and variance warnings; it does not edit files.
+it scores rules in `CLAUDE.md`, `AGENTS.md`, `.codex/AGENTS.md`, `.codex/instructions.md`, and `.openai/instructions.md`, then separates observable violations, partial compliance, duplicated rules, trim candidates, and influence-unknown rules. `instructions ablate --dry-run` creates a conservative ablation plan with candidates, sample-count guidance, rollback notes, and variance warnings; it does not edit files. `instructions apply` safely removes exact duplicate instruction lines only, writes backups first, and leaves uncertain rules as recommendations.
 
 `boundaries` checks parallel-agent isolation:
 
@@ -722,6 +723,7 @@ no install needed. npx runs it directly.
 | `timeline` | recurring context-waste patterns across recent sessions |
 | `instructions audit` | instruction ROI audit for CLAUDE.md / AGENTS.md violations, partial compliance, duplicates, and influence-unknown rules |
 | `instructions ablate --dry-run` | conservative ablation plan for instruction candidates without editing files |
+| `instructions apply` | safely dedupe exact duplicate instruction lines with backups |
 | `boundaries` | multi-agent boundary check for shared files/artifacts and worktree overlap |
 | `scan --usage` | full repo scan with local usage data |
 | `scan --optimizer-fit` | recommend which token-optimization path fits your repo/session |
