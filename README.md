@@ -30,7 +30,7 @@ prismodev covers the full AI coding session:
 
 ```
 before you code     npx getprismo doctor
-while you code      npx getprismo watch
+while you code      npx getprismo guard --watch
 noisy commands      npx getprismo shield -- npm test
 after you code      npx getprismo receipt
 postmortem          npx getprismo replay
@@ -38,7 +38,8 @@ agent-native        npx getprismo mcp
 ```
 
 **doctor** diagnoses the repo, applies safe fixes, and shows the before/after score.
-**watch** monitors context pressure live and warns when things go wrong.
+**guard** runs live guardrails, context throttle, rescue prompts, context firewall, and dashboard-ready prevention events.
+**watch** monitors context pressure live and is the lower-level diagnostic view behind guard.
 **receipt** explains what repeated, what output dominated, what artifacts leaked, what likely influenced the run, and a heuristic context-efficiency score.
 **replay** reconstructs why a session went sideways and prints a recovery prompt.
 **shield** runs noisy commands without dumping full output back into the agent context.
@@ -271,7 +272,24 @@ this is intentionally not magic interception yet. it is a safe local-first primi
 
 ## new: live guardrails mode
 
-the easiest proactive mode is:
+the easiest proactive mode is guard:
+
+```bash
+npx getprismo connect --token <your Prismo API key>
+npx getprismo guard --watch
+```
+
+`guard` packages the local prevention loop: live guardrails, context throttling, context firewall updates, guard event history, and dashboard-ready prevention events. it never uploads prompts, source code, file contents, stdout, stderr, or full command logs.
+
+run it once for a snapshot:
+
+```bash
+npx getprismo guard
+npx getprismo guard --json
+npx getprismo guard --no-sync
+```
+
+the lower-level watch mode is:
 
 ```bash
 npx getprismo watch --auto
@@ -760,6 +778,14 @@ npx getprismo doctor --json              # machine-readable output
 ---
 
 ## watch modes
+
+```bash
+npx getprismo guard                     # proactive local guard snapshot
+npx getprismo guard --watch             # keep guardrails active and sync prevention events
+npx getprismo guard --no-sync           # keep all guard events local
+npx getprismo guard --dry-run           # preview guard actions without writing state
+npx getprismo guard --json              # dashboard-ready guard payload
+```
 
 ```bash
 npx getprismo watch                      # live refresh
