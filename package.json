@@ -1,6 +1,6 @@
 {
   "name": "getprismo",
-  "version": "0.1.33",
+  "version": "0.1.34",
   "description": "Local AI coding workflow scanner for Codex, Claude Code, Cursor, and token-waste diagnostics.",
   "license": "MIT",
   "homepage": "https://github.com/shanirsh/prismodev#readme",
