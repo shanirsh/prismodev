@@ -414,3 +414,188 @@ test("VALID_MODES contains expected modes", () => {
   assert.ok(agent.VALID_MODES.has("autopilot"));
   assert.equal(agent.VALID_MODES.size, 3);
 });
+
+test("auto-detect runs doctor proactively and reports findings", async () => {
+  const detectPayloads = [];
+  const { server, url } = await createServer(async (req, res) => {
+    if (req.method === "POST" && req.url === "/v1/dev/workspace/heartbeat") {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ ok: true }));
+      return;
+    }
+    if (req.method === "POST" && req.url === "/v1/dev/workspace/auto-detect") {
+      detectPayloads.push(await readBody(req));
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ ok: true }));
+      return;
+    }
+    if (req.method === "POST" && req.url === "/v1/dev/workspace/actions/claim?limit=5") {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ actions: [] }));
+      return;
+    }
+    res.writeHead(404);
+    res.end("not found");
+  });
+
+  try {
+    const agent = agentWith({
+      loadConfig: () => ({ token: "test-token", apiUrl: url }),
+      runDoctor: (root, opts) => ({
+        scan: { score: 62, issues: [{ severity: "high", message: ".next exposed" }] },
+        after: { score: 85 },
+        generatedFiles: [".claudeignore"],
+      }),
+    });
+
+    const result = await agent.runAgentOnce(tempDir(), { mode: "autopilot", autoDetect: true });
+
+    assert.ok(result.autoDetect);
+    assert.equal(result.autoDetect.applied, true);
+    assert.equal(result.autoDetect.score, 85);
+    assert.equal(result.autoDetect.findings.length, 1);
+    assert.equal(detectPayloads.length, 1);
+    assert.equal(detectPayloads[0].applied, true);
+  } finally {
+    server.close();
+  }
+});
+
+test("auto-detect in suggest mode marks findings as needing approval", async () => {
+  const { server, url } = await createServer(async (req, res) => {
+    if (req.method === "POST") {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ ok: true }));
+      return;
+    }
+    res.writeHead(404);
+    res.end("not found");
+  });
+
+  try {
+    const agent = agentWith({
+      loadConfig: () => ({ token: "test-token", apiUrl: url }),
+      runDoctor: () => ({
+        scan: { score: 55, issues: [{ severity: "high", message: "node_modules exposed" }] },
+        after: { score: 55 },
+        generatedFiles: [],
+      }),
+    });
+
+    const result = await agent.runAgentOnce(tempDir(), { mode: "suggest", autoDetect: true });
+
+    assert.ok(result.autoDetect);
+    assert.equal(result.autoDetect.applied, false);
+    assert.equal(result.autoDetect.needsApproval, true);
+    assert.ok(result.autoDetect.findings.length >= 1);
+  } finally {
+    server.close();
+  }
+});
+
+test("auto-detect in observe mode does not apply changes", async () => {
+  const { server, url } = await createServer(async (req, res) => {
+    if (req.method === "POST") {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ ok: true }));
+      return;
+    }
+    res.writeHead(404);
+    res.end("not found");
+  });
+
+  try {
+    let doctorOpts = null;
+    const agent = agentWith({
+      loadConfig: () => ({ token: "test-token", apiUrl: url }),
+      runDoctor: (root, opts) => {
+        doctorOpts = opts;
+        return { scan: { score: 90, issues: [] }, after: { score: 90 }, generatedFiles: [] };
+      },
+    });
+
+    const result = await agent.runAgentOnce(tempDir(), { mode: "observe", autoDetect: true });
+
+    assert.ok(result.autoDetect);
+    assert.equal(result.autoDetect.applied, false);
+    assert.equal(result.autoDetect.needsApproval, false);
+    assert.equal(doctorOpts.dryRun, true);
+  } finally {
+    server.close();
+  }
+});
+
+test("auto-detect is skipped when autoDetect option is false", async () => {
+  const { server, url } = await createServer(async (req, res) => {
+    if (req.method === "POST") {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ actions: [] }));
+      return;
+    }
+    res.writeHead(404);
+    res.end("not found");
+  });
+
+  try {
+    const agent = agentWith({
+      loadConfig: () => ({ token: "test-token", apiUrl: url }),
+    });
+
+    const result = await agent.runAgentOnce(tempDir(), { autoDetect: false });
+
+    assert.equal(result.autoDetect, null);
+  } finally {
+    server.close();
+  }
+});
+
+test("openWorkspace returns the default workspace URL", () => {
+  let opened = null;
+  const agent = createAgent({
+    fs,
+    http,
+    https: require("https"),
+    path,
+    NPX_COMMAND: "npx -y getprismo@latest",
+    PACKAGE_VERSION: "0.0.0-test",
+    loadConfig: () => ({ token: "t" }),
+    runDoctor: () => ({}),
+    runSync: async () => ({}),
+    runGuard: async () => ({}),
+    runShield: () => ({}),
+    runOptimize: () => ({}),
+    openUrl: (url) => { opened = url; },
+  });
+
+  const url = agent.openWorkspace({ token: "t" });
+  assert.equal(url, "https://app.getprismo.dev/dashboard/dev");
+  assert.equal(opened, "https://app.getprismo.dev/dashboard/dev");
+});
+
+test("auto-detect terminal output shows findings", () => {
+  const agent = agentWith();
+
+  const output = agent.renderAgentTerminal({
+    connected: true,
+    mode: "autopilot",
+    apiUrl: "https://api.getprismo.dev",
+    actionsClaimed: 0,
+    actionsCompleted: 0,
+    actionsFailed: 0,
+    actionsObserved: 0,
+    autoDetect: {
+      score: 72,
+      findings: [{ type: "low-score", score: 72, message: "Context health score is 72/100." }],
+      generatedFiles: [".claudeignore"],
+      applied: true,
+      needsApproval: false,
+    },
+    results: [],
+  });
+
+  assert.ok(output.includes("Auto-detect"));
+  assert.ok(output.includes("Score: 72/100"));
+  assert.ok(output.includes("auto-fixed"));
+  assert.ok(output.includes(".claudeignore"));
+  assert.ok(output.includes("Context health score is 72/100."));
+});
