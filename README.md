@@ -34,6 +34,7 @@ while you code      npx getprismo guard --watch
 noisy commands      npx getprismo shield -- npm test
 after you code      npx getprismo receipt
 postmortem          npx getprismo replay
+workspace agent     npx getprismo agent --watch
 agent-native        npx getprismo mcp
 ```
 
@@ -43,6 +44,7 @@ agent-native        npx getprismo mcp
 **receipt** explains what repeated, what output dominated, what artifacts leaked, what likely influenced the run, and a heuristic context-efficiency score.
 **replay** reconstructs why a session went sideways and prints a recovery prompt.
 **shield** runs noisy commands without dumping full output back into the agent context.
+**agent** connects Prismo Cloud to your local repo so dashboard actions can safely run on this machine.
 **mcp** exposes PrismoDev as local tools so compatible agents can scan, search shield output, and request scoped context directly.
 
 ---
@@ -267,6 +269,34 @@ MCP: prismo_shield_run -> prismo_shield_search
 ```
 
 this is intentionally not magic interception yet. it is a safe local-first primitive you can tell agents to use for noisy commands.
+
+---
+
+## workspace agent
+
+Prismo Cloud can guide the work from the dashboard, but your repo still lives on your machine. `agent` is the local bridge.
+
+```bash
+npx getprismo connect --token <your Prismo API key>
+npx getprismo agent --watch
+```
+
+After that, the Prismo workspace can queue safe actions like `doctor`, `sync`, `guard`, `context`, `optimize`, and allowlisted `shield` commands. The local agent claims those actions, executes them in the selected repo, and reports the status back to Prismo Cloud.
+
+This keeps the product flow simple:
+
+```text
+dashboard recommends fix -> local agent runs safe command -> dashboard refreshes with the result
+```
+
+`agent` does not upload prompts, source code, file contents, stdout, stderr, or full command logs. It uploads action status and safe aggregate metrics. Cloud actions are intentionally limited; arbitrary shell commands and shell metacharacters are rejected.
+
+For CI-style polling or debugging, run one pass:
+
+```bash
+npx getprismo agent --once
+npx getprismo agent --once --json
+```
 
 ---
 
@@ -753,6 +783,7 @@ no install needed. npx runs it directly.
 | `optimize` | generate `.prismo/` context packs |
 | `context` | print paste-ready prompt for agents |
 | `shield` | run noisy commands while keeping full output out of chat |
+| `agent` | claim and execute safe Prismo Cloud workspace actions locally |
 | `mcp` | expose PrismoDev tools over local MCP stdio |
 | `setup` | detect tools, logs, proxy readiness |
 | `usage` | show raw session token usage |
@@ -816,6 +847,17 @@ npx getprismo shield -- pytest -q
 npx getprismo shield --json -- npm run build
 npx getprismo shield last
 npx getprismo shield search "auth failure"
+```
+
+### workspace agent mode
+
+```bash
+npx getprismo agent                      # claim queued workspace actions once
+npx getprismo agent --watch              # keep polling Prismo Cloud for safe actions
+npx getprismo agent --interval 15        # poll every 15 seconds
+npx getprismo agent --limit 3            # claim up to 3 actions per poll
+npx getprismo agent --json               # machine-readable action result
+npx getprismo agent /path/to/repo         # run actions against a specific repo
 ```
 
 ### mcp mode
