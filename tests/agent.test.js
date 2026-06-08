@@ -568,8 +568,8 @@ test("openWorkspace returns the default workspace URL", () => {
   });
 
   const url = agent.openWorkspace({ token: "t" });
-  assert.equal(url, "https://app.getprismo.dev/dashboard/dev");
-  assert.equal(opened, "https://app.getprismo.dev/dashboard/dev");
+  assert.equal(url, "https://getprismo.dev/dashboard/dev");
+  assert.equal(opened, "https://getprismo.dev/dashboard/dev");
 });
 
 test("auto-detect terminal output shows findings", () => {
