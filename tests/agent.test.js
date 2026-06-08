@@ -386,6 +386,50 @@ test("agent heartbeat failure does not block poll cycle", async () => {
   }
 });
 
+test("agent can sync telemetry during a poll cycle", async () => {
+  const { server, url } = await createServer(async (req, res) => {
+    if (req.method === "POST" && req.url === "/v1/dev/workspace/heartbeat") {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ ok: true }));
+      return;
+    }
+    if (req.method === "POST" && req.url === "/v1/dev/workspace/actions/claim?limit=5") {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ actions: [] }));
+      return;
+    }
+    res.writeHead(404);
+    res.end("not found");
+  });
+
+  try {
+    let synced = false;
+    const agent = agentWith({
+      loadConfig: () => ({ token: "test-token", apiUrl: url }),
+      runSync: async () => {
+        synced = true;
+        return {
+          synced: true,
+          aggregate: {
+            sessions: 2,
+            estimatedWastedTokens: 1200,
+            wastePercent: 12,
+          },
+        };
+      },
+    });
+
+    const result = await agent.runAgentOnce(tempDir(), { syncTelemetry: true });
+
+    assert.equal(synced, true);
+    assert.equal(result.sync.synced, true);
+    assert.equal(result.sync.sessions, 2);
+    assert.equal(result.sync.estimatedWastedTokens, 1200);
+  } finally {
+    server.close();
+  }
+});
+
 test("agent terminal output includes mode", () => {
   const agent = agentWith();
 

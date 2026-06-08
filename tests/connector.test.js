@@ -41,18 +41,20 @@ test("connector writes a background runner for the selected repo", () => {
 
   withEnv("PRISMO_HOME", path.join(home, ".prismo"), () => {
     const connector = connectorWith(home);
-    const result = connector.writeRunner(repo, { interval: 30, mode: "suggest" });
+    const result = connector.writeRunner(repo, { interval: 30, syncInterval: 120, mode: "suggest" });
 
     assert.equal(result.root, path.resolve(repo));
     assert.equal(result.interval, 30);
+    assert.equal(result.syncInterval, 120);
     assert.equal(result.mode, "suggest");
 
     const runner = fs.readFileSync(path.join(home, ".prismo", "connector", "run.sh"), "utf8");
-    assert.ok(runner.includes("npx -y getprismo@latest agent --watch --interval 30 --mode 'suggest'"));
+    assert.ok(runner.includes("npx -y getprismo@latest agent --watch --interval 30 --sync-interval 120 --mode 'suggest'"));
     assert.ok(runner.includes(path.resolve(repo)));
 
     const state = JSON.parse(fs.readFileSync(path.join(home, ".prismo", "connector", "state.json"), "utf8"));
     assert.equal(state.root, path.resolve(repo));
+    assert.equal(state.syncInterval, 120);
     assert.equal(state.mode, "suggest");
   });
 });
