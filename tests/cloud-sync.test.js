@@ -44,7 +44,7 @@ test("connect, status, sync dry-run, and disconnect support seamless cloud setup
     PRISMO_CURSOR_APP_SUPPORT: path.join(root, "none"),
   };
 
-  const connect = runPrismo(["connect", "--json", "--token", "test-token", "--api-url", "http://127.0.0.1:3999", "--org", "acme", "--user", "dev@example.com", "--device", "Test Laptop"], { env, cwd: root });
+  const connect = runPrismo(["connect", "--json", "--no-agent", "--token", "test-token", "--api-url", "http://127.0.0.1:3999", "--org", "acme", "--user", "dev@example.com", "--device", "Test Laptop"], { env, cwd: root });
   assert.equal(connect.status, 0, connect.stderr);
   const connected = JSON.parse(connect.stdout);
   assert.equal(connected.connected, true);
