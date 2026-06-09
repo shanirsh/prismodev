@@ -56,6 +56,91 @@ function agentWith(overrides = {}) {
   });
 }
 
+test("agent routes actions with a targetCause to the cause-specific executor", async () => {
+  const executorCalls = [];
+  let doctorCalled = false;
+  const agent = agentWith({
+    runDoctor: () => { doctorCalled = true; return { after: { score: 90 } }; },
+    repairExecutors: {
+      forCause: (cause) => (cause === "repeated-file-reads"
+        ? async (action, root, helpers) => {
+            executorCalls.push({ action, root, hasProgress: typeof helpers.progress === "function" });
+            return {
+              status: "completed",
+              statusMessage: "Repaired repeated file reads.",
+              result: { command: "repair", targetCause: "repeated-file-reads" },
+            };
+          }
+        : null),
+    },
+  });
+
+  const result = await agent.executeAction({
+    id: "action-cause-1",
+    actionType: "doctor",
+    command: "npx -y getprismo@latest doctor",
+    label: "Fix repeated file reads",
+    targetCause: "repeated-file-reads",
+  }, tempDir());
+
+  assert.equal(result.status, "completed");
+  assert.equal(result.result.targetCause, "repeated-file-reads");
+  assert.equal(executorCalls.length, 1);
+  assert.equal(executorCalls[0].hasProgress, true);
+  assert.equal(doctorCalled, false);
+});
+
+test("agent falls back to generic dispatch for unknown or missing targetCause", async () => {
+  let doctorCalls = 0;
+  const agent = agentWith({
+    runDoctor: () => { doctorCalls += 1; return { after: { score: 90 } }; },
+    repairExecutors: { forCause: () => null },
+  });
+
+  const withUnknownCause = await agent.executeAction({
+    id: "action-cause-2",
+    actionType: "doctor",
+    command: "npx -y getprismo@latest doctor",
+    label: "Run doctor",
+    targetCause: "not-a-real-cause",
+  }, tempDir());
+  const withoutCause = await agent.executeAction({
+    id: "action-cause-3",
+    actionType: "doctor",
+    command: "npx -y getprismo@latest doctor",
+    label: "Run doctor",
+  }, tempDir());
+
+  assert.equal(withUnknownCause.status, "completed");
+  assert.equal(withUnknownCause.result.command, "doctor");
+  assert.equal(withoutCause.status, "completed");
+  assert.equal(doctorCalls, 2);
+});
+
+test("agent resolves the cause from a repair command when targetCause is missing", async () => {
+  const causesSeen = [];
+  const agent = agentWith({
+    repairExecutors: {
+      forCause: (cause) => {
+        causesSeen.push(cause);
+        return cause === "context-loop"
+          ? async () => ({ status: "completed", statusMessage: "ok", result: { targetCause: "context-loop" } })
+          : null;
+      },
+    },
+  });
+
+  const result = await agent.executeAction({
+    id: "action-cause-4",
+    actionType: "repair",
+    command: "npx -y getprismo@latest repair context-loop",
+    label: "Repair context loop",
+  }, tempDir());
+
+  assert.equal(result.status, "completed");
+  assert.deepEqual(causesSeen, ["context-loop"]);
+});
+
 test("agent reports not connected without polling cloud", async () => {
   const agent = agentWith();
 
