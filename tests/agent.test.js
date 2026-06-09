@@ -194,6 +194,70 @@ test("agent runs the repair planner in autopilot and reports it via auto-detect"
   }
 });
 
+test("agent registers executed self-repairs as workspace actions for cloud verification", async () => {
+  const creates = [];
+  const patches = [];
+  const detectPayloads = [];
+  const { server, url } = await createServer(async (req, res) => {
+    if (req.method === "POST" && req.url === "/v1/dev/workspace/actions/agent") {
+      creates.push(await readBody(req));
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ id: "self-repair-1", status: "queued" }));
+      return;
+    }
+    if (req.method === "PATCH" && req.url === "/v1/dev/workspace/actions/self-repair-1") {
+      patches.push(await readBody(req));
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ ok: true }));
+      return;
+    }
+    if (req.method === "POST" && req.url === "/v1/dev/workspace/auto-detect") {
+      detectPayloads.push(await readBody(req));
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ ok: true }));
+      return;
+    }
+    if (req.method === "POST") {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ actions: [] }));
+      return;
+    }
+    res.writeHead(404);
+    res.end("not found");
+  });
+
+  try {
+    const agent = agentWith({
+      loadConfig: () => ({ token: "test-token", apiUrl: url }),
+      repairPlanner: {
+        runPlannerOnce: async () => ({
+          generatedAt: new Date().toISOString(),
+          sessionsAnalyzed: 3,
+          causes: [{ cause: "repeated-file-reads", wastedTokens: 80000, wasteRate: 0.2, sessions: 2 }],
+          decision: { cause: "repeated-file-reads", tier: "aggressive", reason: "escalated" },
+          skipped: [],
+          executed: true,
+          outcome: { status: "completed", statusMessage: "Repaired repeated file reads.", tier: "aggressive", generatedFiles: [".prismo/hot-files.md"] },
+        }),
+      },
+    });
+
+    const result = await agent.runAgentOnce(tempDir(), { mode: "autopilot", planRepairs: true });
+
+    assert.equal(creates.length, 1);
+    assert.equal(creates[0].targetCause, "repeated-file-reads");
+    assert.equal(creates[0].actionType, "doctor");
+    assert.match(creates[0].label, /Self-repair: repeated-file-reads \(aggressive\)/);
+    assert.equal(patches.length, 1);
+    assert.equal(patches[0].status, "completed");
+    assert.equal(patches[0].result.tier, "aggressive");
+    assert.equal(result.planner.registered, true);
+    assert.equal(detectPayloads.length, 0);
+  } finally {
+    server.close();
+  }
+});
+
 test("agent planner plans without executing outside autopilot", async () => {
   const plannerCalls = [];
   const { server, url } = await createServer(async (req, res) => {
