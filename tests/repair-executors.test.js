@@ -214,6 +214,45 @@ test("long-session-buildup generates scoped packs and a restart routine", async 
   assert.ok(guide.includes("Start from .prismo/frontend-summary.md."));
 });
 
+test("aggressive tier adds a context firewall policy and tightens guard budget", async () => {
+  const root = tempDir();
+  const firewallCalls = [];
+  const guardCalls = [];
+  const executors = executorsWith({
+    runFirewall: (dir, options) => {
+      firewallCalls.push(options);
+      return { generatedFiles: [".prismo/context-firewall.md", ".prismo/blocked-context.txt"] };
+    },
+    runGuard: async (dir, options) => {
+      guardCalls.push(options);
+      return { events: [] };
+    },
+  });
+
+  const report = await executors.runRepair(root, "context-loop", { tier: "aggressive" });
+
+  assert.equal(report.status, "completed");
+  assert.equal(report.result.tier, "aggressive");
+  assert.deepEqual(firewallCalls, [{ task: "context-loop", dryRun: false }]);
+  assert.equal(guardCalls[0].tokenBudget, 250000);
+  assert.ok(report.result.generatedFiles.includes(".prismo/context-firewall.md"));
+  assert.match(report.statusMessage, /Aggressive tier/);
+});
+
+test("mild tier does not touch the firewall", async () => {
+  const root = tempDir();
+  let firewallCalled = false;
+  const executors = executorsWith({
+    runFirewall: () => { firewallCalled = true; return { generatedFiles: [] }; },
+  });
+
+  const report = await executors.runRepair(root, "repeated-file-reads");
+
+  assert.equal(report.status, "completed");
+  assert.equal(report.result.tier, "mild");
+  assert.equal(firewallCalled, false);
+});
+
 test("runRepair fails cleanly on unknown cause", async () => {
   const executors = executorsWith();
 

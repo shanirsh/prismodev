@@ -141,6 +141,121 @@ test("agent resolves the cause from a repair command when targetCause is missing
   assert.deepEqual(causesSeen, ["context-loop"]);
 });
 
+test("agent runs the repair planner in autopilot and reports it via auto-detect", async () => {
+  const plannerCalls = [];
+  const detectPayloads = [];
+  const { server, url } = await createServer(async (req, res) => {
+    if (req.method === "POST" && req.url === "/v1/dev/workspace/auto-detect") {
+      detectPayloads.push(await readBody(req));
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ ok: true }));
+      return;
+    }
+    if (req.method === "POST") {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ actions: [] }));
+      return;
+    }
+    res.writeHead(404);
+    res.end("not found");
+  });
+
+  try {
+    const agent = agentWith({
+      loadConfig: () => ({ token: "test-token", apiUrl: url }),
+      repairPlanner: {
+        runPlannerOnce: async (root, options) => {
+          plannerCalls.push(options);
+          return {
+            generatedAt: new Date().toISOString(),
+            sessionsAnalyzed: 3,
+            causes: [{ cause: "context-loop", wastedTokens: 60000, wasteRate: 0.3, sessions: 2 }],
+            decision: { cause: "context-loop", tier: "mild", reason: "top cause" },
+            skipped: [],
+            executed: true,
+            outcome: { status: "completed", statusMessage: "Repaired context loop.", tier: "mild", generatedFiles: [".prismo/loop-breaker.md"] },
+          };
+        },
+      },
+    });
+
+    const result = await agent.runAgentOnce(tempDir(), { mode: "autopilot", planRepairs: true });
+
+    assert.equal(plannerCalls.length, 1);
+    assert.equal(plannerCalls[0].execute, true);
+    assert.ok(result.planner);
+    assert.equal(result.planner.decision.cause, "context-loop");
+    assert.equal(detectPayloads.length, 1);
+    assert.equal(detectPayloads[0].applied, true);
+    assert.equal(detectPayloads[0].findings[0].type, "self-repair");
+    assert.equal(detectPayloads[0].findings[0].cause, "context-loop");
+  } finally {
+    server.close();
+  }
+});
+
+test("agent planner plans without executing outside autopilot", async () => {
+  const plannerCalls = [];
+  const { server, url } = await createServer(async (req, res) => {
+    if (req.method === "POST") {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ actions: [] }));
+      return;
+    }
+    res.writeHead(404);
+    res.end("not found");
+  });
+
+  try {
+    const agent = agentWith({
+      loadConfig: () => ({ token: "test-token", apiUrl: url }),
+      repairPlanner: {
+        runPlannerOnce: async (root, options) => {
+          plannerCalls.push(options);
+          return { generatedAt: new Date().toISOString(), sessionsAnalyzed: 0, causes: [], decision: null, skipped: [], executed: false, outcome: null };
+        },
+      },
+    });
+
+    const result = await agent.runAgentOnce(tempDir(), { mode: "observe", planRepairs: true });
+
+    assert.equal(plannerCalls.length, 1);
+    assert.equal(plannerCalls[0].execute, false);
+    assert.equal(result.planner.executed, false);
+  } finally {
+    server.close();
+  }
+});
+
+test("agent skips the planner when planRepairs is not set", async () => {
+  const { server, url } = await createServer(async (req, res) => {
+    if (req.method === "POST") {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ actions: [] }));
+      return;
+    }
+    res.writeHead(404);
+    res.end("not found");
+  });
+
+  try {
+    let plannerCalled = false;
+    const agent = agentWith({
+      loadConfig: () => ({ token: "test-token", apiUrl: url }),
+      repairPlanner: {
+        runPlannerOnce: async () => { plannerCalled = true; return {}; },
+      },
+    });
+
+    const result = await agent.runAgentOnce(tempDir(), { mode: "autopilot" });
+
+    assert.equal(plannerCalled, false);
+    assert.equal(result.planner, null);
+  } finally {
+    server.close();
+  }
+});
+
 test("agent reports not connected without polling cloud", async () => {
   const agent = agentWith();
 
