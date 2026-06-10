@@ -324,6 +324,47 @@ test("agent planner plans without executing outside autopilot", async () => {
   }
 });
 
+test("agent fetches fleet priors and passes them to the planner", async () => {
+  const plannerOptions = [];
+  const { server, url } = await createServer(async (req, res) => {
+    if (req.method === "GET" && req.url === "/v1/dev/fleet/repair-priors") {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({
+        totalVerdicts: 20,
+        priors: [{ cause: "context-loop", tier: "mild", attempts: 10, improved: 2, improveRate: 0.2 }],
+      }));
+      return;
+    }
+    if (req.method === "POST") {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ actions: [] }));
+      return;
+    }
+    res.writeHead(404);
+    res.end("not found");
+  });
+
+  try {
+    const agent = agentWith({
+      loadConfig: () => ({ token: "test-token", apiUrl: url }),
+      repairPlanner: {
+        runPlannerOnce: async (root, options) => {
+          plannerOptions.push(options);
+          return { generatedAt: new Date().toISOString(), sessionsAnalyzed: 0, causes: [], decision: null, skipped: [], executed: false, outcome: null };
+        },
+      },
+    });
+
+    await agent.runAgentOnce(tempDir(), { mode: "autopilot", planRepairs: true });
+
+    assert.equal(plannerOptions.length, 1);
+    assert.equal(plannerOptions[0].fleetPriors.length, 1);
+    assert.equal(plannerOptions[0].fleetPriors[0].cause, "context-loop");
+  } finally {
+    server.close();
+  }
+});
+
 test("agent skips the planner when planRepairs is not set", async () => {
   const { server, url } = await createServer(async (req, res) => {
     if (req.method === "POST") {

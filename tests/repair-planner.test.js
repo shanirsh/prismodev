@@ -218,6 +218,71 @@ test("planner survives a usage-summary failure", () => {
   assert.equal(result.decision, null);
 });
 
+test("fleet priors start a first repair aggressive when mild rarely works", () => {
+  const { planner } = plannerWith([
+    session(1 * HOUR, 200000, 60000, "tool-output-flood"),
+  ]);
+
+  const result = planner.plan(tempDir(), {
+    fleetPriors: [
+      { cause: "tool-output-flood", tier: "mild", attempts: 12, improved: 3, improveRate: 0.25 },
+      { cause: "tool-output-flood", tier: "aggressive", attempts: 8, improved: 6, improveRate: 0.75 },
+    ],
+  });
+
+  assert.equal(result.decision.cause, "tool-output-flood");
+  assert.equal(result.decision.tier, "aggressive");
+  assert.match(result.decision.reason, /Fleet experience/);
+  assert.match(result.decision.reason, /25% of the time vs 75%/);
+});
+
+test("fleet priors are ignored without enough samples or when mild works", () => {
+  const { planner } = plannerWith([
+    session(1 * HOUR, 200000, 60000, "tool-output-flood"),
+  ]);
+
+  const thinSample = planner.plan(tempDir(), {
+    fleetPriors: [
+      { cause: "tool-output-flood", tier: "mild", attempts: 2, improved: 0, improveRate: 0 },
+      { cause: "tool-output-flood", tier: "aggressive", attempts: 2, improved: 2, improveRate: 1 },
+    ],
+  });
+  const mildWorks = planner.plan(tempDir(), {
+    fleetPriors: [
+      { cause: "tool-output-flood", tier: "mild", attempts: 20, improved: 14, improveRate: 0.7 },
+      { cause: "tool-output-flood", tier: "aggressive", attempts: 10, improved: 8, improveRate: 0.8 },
+    ],
+  });
+
+  assert.equal(thinSample.decision.tier, "mild");
+  assert.equal(mildWorks.decision.tier, "mild");
+});
+
+test("local verdict history outranks fleet priors", () => {
+  const root = tempDir();
+  writeState(root, {
+    causes: { "tool-output-flood": { lastRepairAt: new Date(Date.now() - 8 * HOUR).toISOString(), lastTier: "mild", attempts: 1 } },
+    history: [],
+  });
+  const { planner } = plannerWith([
+    session(10 * HOUR, 200000, 120000, "tool-output-flood"),
+    session(2 * HOUR, 200000, 40000, "tool-output-flood"),
+    session(1 * HOUR, 200000, 40000, "tool-output-flood"),
+  ]);
+
+  // Fleet says mild rarely works, but our own mild repair just improved
+  // this cause — stay mild.
+  const result = planner.plan(root, {
+    fleetPriors: [
+      { cause: "tool-output-flood", tier: "mild", attempts: 12, improved: 3, improveRate: 0.25 },
+      { cause: "tool-output-flood", tier: "aggressive", attempts: 8, improved: 6, improveRate: 0.75 },
+    ],
+  });
+
+  assert.equal(result.decision.tier, "mild");
+  assert.equal(result.decision.previousVerdict, "improved");
+});
+
 test("renderPlannerTerminal shows causes, decision, and holds", () => {
   const { planner } = plannerWith([]);
 
