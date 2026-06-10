@@ -4,13 +4,13 @@
 [![npm downloads](https://img.shields.io/npm/dw/getprismo.svg)](https://www.npmjs.com/package/getprismo)
 [![license: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-local ai coding cost control. one command to diagnose token waste, fix it, and prove the improvement.
+an autonomous cost agent for ai coding. it finds token waste, fixes the cause, verifies the fix against your next sessions in dollars, and escalates or backs off based on what actually worked. unattended.
 
 ```bash
 npx getprismo doctor
 ```
 
-that's it. run it on any repo. no api keys, no login, no data leaves your machine.
+that's it. run it on any repo. no api keys, no login, no data leaves your machine. connect it once and it runs itself.
 
 ---
 
@@ -31,14 +31,20 @@ prismodev covers the full AI coding session:
 ```
 before you code     npx getprismo doctor
 while you code      npx getprismo guard --watch
+enforce at runtime  npx getprismo enforce install
 noisy commands      npx getprismo shield -- npm test
+targeted repairs    npx getprismo repair auto
 after you code      npx getprismo receipt
 postmortem          npx getprismo replay
+weekly receipt      npx getprismo digest
 workspace agent     npx getprismo agent --watch
 agent-native        npx getprismo mcp
 ```
 
 **doctor** diagnoses the repo, applies safe fixes, and shows the before/after score.
+**repair** runs the targeted fix for one waste cause; `repair auto` lets the planner pick.
+**enforce** turns the context firewall into actual runtime enforcement via Claude Code hooks.
+**digest** prints the verified-savings summary for the week, ready to paste into Slack.
 **guard** runs live guardrails, context throttle, rescue prompts, context firewall, and dashboard-ready prevention events.
 **watch** monitors context pressure live and is the lower-level diagnostic view behind guard.
 **receipt** explains what repeated, what output dominated, what artifacts leaked, what likely influenced the run, and a heuristic context-efficiency score.
@@ -46,6 +52,58 @@ agent-native        npx getprismo mcp
 **shield** runs noisy commands without dumping full output back into the agent context.
 **agent** connects Prismo Cloud to your local repo so dashboard actions can safely run on this machine.
 **mcp** exposes PrismoDev as local tools so compatible agents can scan, search shield output, and request scoped context directly.
+
+---
+
+## new: the self-driving loop
+
+connect once and prismodev operates itself:
+
+```bash
+npx getprismo connect --token <your prismo api key>
+```
+
+from that point, on every machine running the connector:
+
+1. **detect** — session telemetry syncs continuously; waste is attributed to one of five causes: repeated file reads, tool-output floods, generated artifacts, context loops, long-session buildup.
+2. **decide** — a local planner scores causes against thresholds, respects cooldowns, and won't re-repair a cause until enough new sessions arrived to judge the last attempt. the backend auto-queues repairs the same way — no dashboard clicks.
+3. **repair** — each cause has a dedicated executor (not doctor-for-everything): ignore rules + hot-file maps, shield staging, firewall policies, tightened guard budgets, scoped context packs with restart routines.
+4. **verify** — after a repair, the waste rate for that cause is measured in your *later* sessions (14-day baseline, real before/after math). verdicts: `improved`, `no-change`, `regressed`.
+5. **adapt** — `improved` stays mild. `no-change`/`regressed` escalates to an aggressive tier (context firewall + tighter budgets). a cause that fails both tiers is held for your review instead of being retried forever — the one moment a human is genuinely needed, surfaced loudly.
+
+savings are reported in **dollars, verified** — converted with a model-aware blended rate weighted across your actual sessions — on the dashboard and via `prismo digest`.
+
+and it learns across the fleet: anonymized repair verdicts (counts only, no repo/org identifiers) aggregate into priors, so when the fleet already knows mild repairs rarely fix a cause, your first repair starts at the tier that works. your own verdicts always outrank the fleet's.
+
+run one planner cycle by hand to see it think:
+
+```bash
+npx getprismo repair auto --dry-run
+```
+
+---
+
+## new: runtime enforcement
+
+advisory guardrails only help if the agent reads them. for claude code, prismodev can enforce them:
+
+```bash
+npx getprismo enforce install
+```
+
+this wires a `PreToolUse` hook (with a backup of `.claude/settings.json`) that:
+
+- **denies reads into blocked context** — `node_modules/`, build output, logs, lockfiles — with a reason pointing the agent at the compact `.prismo/` context packs instead
+- **denies the fourth attempt of an identical command** in one session, suggesting one shielded run instead of an expensive retry loop
+
+```text
+permissionDecision: deny
+reason: Prismo context firewall: "logs/huge.log" is blocked context (rule: logs/**).
+        Use the .prismo/ context packs instead, or run `npx getprismo shield -- <command>`
+        if you need its contents summarized.
+```
+
+enforcement fails open — malformed events or missing policy files allow the call, so it can never break a working agent. `enforce uninstall` removes only the prismo hook. other agents keep following the advisory `.prismo` files.
 
 ---
 
@@ -762,6 +820,9 @@ no install needed. npx runs it directly.
 | command | what it does |
 |---------|-------------|
 | `doctor` | diagnose, fix, optimize, show before/after |
+| `repair <cause\|auto>` | targeted repair for one waste cause; auto = planner picks with cooldowns and verdict feedback |
+| `enforce` | runtime enforcement of the context firewall via claude code hooks |
+| `digest` | verified-savings summary for the week, in dollars, ready for slack |
 | `watch` | live session monitoring with warnings |
 | `cc` | claude code cost breakdown |
 | `cc timeline` | session reconstruction with events |
@@ -1067,6 +1128,9 @@ lib/prismo-dev/instructions.js   instruction ROI, partial-compliance, and ablati
 lib/prismo-dev/mcp.js            local MCP server and Prismo tool bindings
 lib/prismo-dev/receipt.js        run receipts for reads, output, artifacts, and next scope
 lib/prismo-dev/report.js         terminal, markdown, ci reports
+lib/prismo-dev/repair-executors.js  cause-specific repair executors with mild/aggressive tiers
+lib/prismo-dev/repair-planner.js    autonomous planner: cause scoring, cooldowns, local verdicts, escalation
+lib/prismo-dev/enforce.js        claude code PreToolUse hook enforcement and settings wiring
 lib/prismo-dev/replay.js         incident replay and recovery prompts
 lib/prismo-dev/scan.js           repo scanning, scoring, readiness
 lib/prismo-dev/scan-path-utils.js scan ignore/path helper logic
@@ -1090,6 +1154,8 @@ lib/prismo-dev/watch-render.js   watch terminal and guardrail renderers
 npx getprismo --help
 npx getprismo --version
 npx getprismo doctor --help
+npx getprismo repair --help
+npx getprismo enforce --help
 npx getprismo watch --help
 npx getprismo shield --help
 npx getprismo mcp --help
