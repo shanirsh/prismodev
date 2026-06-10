@@ -117,6 +117,39 @@ test("agent falls back to generic dispatch for unknown or missing targetCause", 
   assert.equal(doctorCalls, 2);
 });
 
+test("agent passes --tier from an escalated cloud command to the executor", async () => {
+  const tiersSeen = [];
+  const agent = agentWith({
+    repairExecutors: {
+      forCause: (cause) => (cause === "tool-output-flood"
+        ? async (action, root, helpers) => {
+            tiersSeen.push(helpers.options.tier || null);
+            return { status: "completed", statusMessage: "ok", result: { targetCause: cause, tier: helpers.options.tier } };
+          }
+        : null),
+    },
+  });
+
+  const escalated = await agent.executeAction({
+    id: "action-tier-1",
+    actionType: "shield",
+    command: "npx -y getprismo@latest repair tool-output-flood --tier aggressive",
+    label: "Auto-queued: Tool-output floods",
+    targetCause: "tool-output-flood",
+  }, tempDir());
+  const mild = await agent.executeAction({
+    id: "action-tier-2",
+    actionType: "shield",
+    command: "npx -y getprismo@latest repair tool-output-flood",
+    label: "Auto-queued: Tool-output floods",
+    targetCause: "tool-output-flood",
+  }, tempDir());
+
+  assert.equal(escalated.result.tier, "aggressive");
+  assert.equal(mild.status, "completed");
+  assert.deepEqual(tiersSeen, ["aggressive", null]);
+});
+
 test("agent resolves the cause from a repair command when targetCause is missing", async () => {
   const causesSeen = [];
   const agent = agentWith({
