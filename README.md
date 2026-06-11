@@ -4,7 +4,7 @@
 [![npm downloads](https://img.shields.io/npm/dw/getprismo.svg)](https://www.npmjs.com/package/getprismo)
 [![license: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-an autonomous cost agent for ai coding. it finds token waste, fixes the cause, verifies the fix against your next sessions in dollars, and escalates or backs off based on what actually worked. unattended.
+an agent control plane for ai coding. it watches local coding agents, finds token waste, stages or executes safe interventions, verifies the fix against your next sessions in dollars, and escalates or backs off based on what actually worked. unattended.
 
 ```bash
 npx getprismo doctor
@@ -20,7 +20,7 @@ ai coding agents (claude code, codex, cursor) burn tokens on things that don't h
 
 most developers don't realize this is happening until the bill arrives or the agent starts looping.
 
-prismodev catches it before, during, and after.
+prismodev gives you a control plane for it before, during, and after.
 
 ---
 
@@ -39,12 +39,13 @@ postmortem          npx getprismo replay
 weekly receipt      npx getprismo digest
 workspace agent     npx getprismo agent --watch
 agent-native        npx getprismo mcp
+optional bridge     npx getprismo bridge
 ```
 
 **doctor** diagnoses the repo, applies safe fixes, and shows the before/after score.
 **repair** runs the targeted fix for one waste cause; `repair auto` lets the planner pick.
 **enforce** turns the context firewall into actual runtime enforcement via Claude Code hooks.
-**digest** prints the verified-savings summary for the week, ready to paste into Slack.
+**digest** prints the launch report: verified saved tokens/dollars first, live prevention clearly labeled as estimated, ready to post or paste into Slack.
 **guard** runs live guardrails, context throttle, rescue prompts, context firewall, and dashboard-ready prevention events.
 **watch** monitors context pressure live and is the lower-level diagnostic view behind guard.
 **receipt** explains what repeated, what output dominated, what artifacts leaked, what likely influenced the run, and a heuristic context-efficiency score.
@@ -52,6 +53,7 @@ agent-native        npx getprismo mcp
 **shield** runs noisy commands without dumping full output back into the agent context.
 **agent** connects Prismo Cloud to your local repo so dashboard actions can safely run on this machine.
 **mcp** exposes PrismoDev as local tools so compatible agents can scan, search shield output, and request scoped context directly.
+**bridge** explains the optional tighter control layer for teams that want Prismo closer to the agent execution path.
 
 ---
 
@@ -104,6 +106,24 @@ reason: Prismo context firewall: "logs/huge.log" is blocked context (rule: logs/
 ```
 
 enforcement fails open — malformed events or missing policy files allow the call, so it can never break a working agent. `enforce uninstall` removes only the prismo hook. other agents keep following the advisory `.prismo` files.
+
+---
+
+## new: optional bridge mode
+
+the background connector is the default. it observes local sessions, syncs safe aggregate telemetry, applies queued repairs, verifies the next sessions, and shows live events in the dashboard. it does not sit in front of every agent action.
+
+bridge mode is optional context for teams that want Prismo closer to the agent execution path, especially for live loop stopping:
+
+```bash
+npx getprismo bridge
+```
+
+- **Claude Code**: hard-block capable today through `npx getprismo enforce install`, which adds a `PreToolUse` hook that can deny blocked-context reads and repeated command loops before they run.
+- **Codex**: visible and repairable through local session logs, guardrails, shield, and MCP. universal hard-blocking needs Codex to run through a wrapper/bridge or expose a pre-tool hook.
+- **Cursor**: visible and repairable through local telemetry and staged repairs. universal hard-blocking needs Cursor to run through a wrapper/bridge or expose a pre-tool hook.
+
+that is why Prismo is not described as a proxy by default. connector mode is safer and simpler; bridge mode is the opt-in path when stronger live interception matters more than staying fully out of the agent execution path.
 
 ---
 
@@ -846,6 +866,7 @@ no install needed. npx runs it directly.
 | `shield` | run noisy commands while keeping full output out of chat |
 | `agent` | claim and execute safe Prismo Cloud workspace actions locally |
 | `mcp` | expose PrismoDev tools over local MCP stdio |
+| `bridge` | explain optional bridge mode and live interception levels for Claude Code, Codex, and Cursor |
 | `setup` | detect tools, logs, proxy readiness |
 | `usage` | show raw session token usage |
 | `init` | add npm scripts and .prismo/README.md |
@@ -1156,6 +1177,7 @@ npx getprismo --version
 npx getprismo doctor --help
 npx getprismo repair --help
 npx getprismo enforce --help
+npx getprismo bridge --help
 npx getprismo watch --help
 npx getprismo shield --help
 npx getprismo mcp --help

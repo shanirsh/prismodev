@@ -143,3 +143,6 @@ media/
 staticfiles/
 static_collected/
 .claude/worktrees/
+
+# Added by PrismoDev
+.prismo/

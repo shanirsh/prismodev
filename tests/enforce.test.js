@@ -127,6 +127,12 @@ test("three recorded failures block the next attempt", () => {
   const denied = enforce.decidePreToolUse(root, pre());
   assert.ok(denied);
   assert.match(denied.hookSpecificOutput.permissionDecisionReason, /failed 3 times/);
+  const state = JSON.parse(fs.readFileSync(path.join(root, ".prismo", "enforce-state.json"), "utf8"));
+  assert.equal(state.loopStops.length, 1);
+  assert.equal(state.loopStops[0].tool, "claude-code");
+  assert.equal(state.loopStops[0].reason, "repeated-failing-command");
+  assert.equal(state.loopStops[0].failures, 3);
+  assert.equal(state.loopStops[0].estimatedTokensSaved, 2000);
 });
 
 test("unknown response shapes record nothing and keep the attempt fallback", () => {

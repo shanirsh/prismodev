@@ -515,6 +515,80 @@ test("agent sends heartbeat on each poll cycle", async () => {
   }
 });
 
+test("agent publishes Claude loop stops and Codex/Cursor loop detections as live events", async () => {
+  const liveEvents = [];
+  const { server, url } = await createServer(async (req, res) => {
+    if (req.method === "POST" && req.url === "/v1/dev/workspace/heartbeat") {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ ok: true }));
+      return;
+    }
+    if (req.method === "POST" && req.url === "/v1/dev/workspace/live-events") {
+      liveEvents.push(await readBody(req));
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ ok: true }));
+      return;
+    }
+    if (req.method === "POST" && req.url === "/v1/dev/workspace/actions/claim?limit=5") {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ actions: [] }));
+      return;
+    }
+    res.writeHead(404);
+    res.end("not found");
+  });
+
+  try {
+    const root = tempDir();
+    fs.mkdirSync(path.join(root, ".prismo"), { recursive: true });
+    fs.writeFileSync(path.join(root, ".prismo", "enforce-state.json"), JSON.stringify({
+      loopStops: [{
+        eventId: "claude-stop-1",
+        at: "2026-06-11T18:00:00Z",
+        tool: "claude-code",
+        command: "npm test",
+        reason: "repeated-failing-command",
+        failures: 3,
+        estimatedTokensSaved: 2000,
+        sessionId: "claude-session",
+      }],
+    }), "utf8");
+
+    const agent = agentWith({
+      loadConfig: () => ({ token: "test-token", apiUrl: url }),
+      getUsageSummary: () => ({
+        sessions: [
+          {
+            tool: "codex",
+            sessionId: "codex-session",
+            updatedAt: "2026-06-11T18:01:00Z",
+            repeatedCommands: [{ value: "pytest -q", count: 4 }],
+            loopSuspicion: true,
+          },
+          {
+            tool: "cursor",
+            sessionId: "cursor-session",
+            updatedAt: "2026-06-11T18:02:00Z",
+            repeatedCommands: [{ value: "npm run build", count: 3 }],
+            loopSuspicion: false,
+          },
+        ],
+      }),
+    });
+
+    await agent.runAgentOnce(root);
+
+    const eventTypes = liveEvents.map((event) => event.eventType);
+    assert.ok(eventTypes.includes("loop_stopped"));
+    assert.equal(liveEvents.find((event) => event.eventType === "loop_stopped").phase, "stopped");
+    assert.equal(liveEvents.filter((event) => event.eventType === "loop_detected").length, 2);
+    assert.ok(liveEvents.some((event) => /Codex loop pattern/.test(event.headline)));
+    assert.ok(liveEvents.some((event) => /Cursor loop pattern/.test(event.headline)));
+  } finally {
+    server.close();
+  }
+});
+
 test("agent observe mode reports actions without executing", async () => {
   const requests = [];
   const { server, url } = await createServer(async (req, res) => {

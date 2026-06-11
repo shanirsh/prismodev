@@ -71,6 +71,25 @@ test("command-specific help and demo mode are available", () => {
   assert.ok(demo.stdout.includes("Try it on your repo"));
 });
 
+test("bridge command explains optional live interception levels", () => {
+  const root = tempRepo();
+  const result = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "bridge", "--json", root],
+    { encoding: "utf8" }
+  );
+
+  assert.equal(result.status, 0, result.stderr);
+  const payload = JSON.parse(result.stdout);
+  assert.equal(payload.command, "bridge");
+  assert.equal(payload.optional, true);
+  assert.equal(payload.root, root);
+  assert.equal(payload.privacy.rawPrompts, false);
+  assert.deepEqual(payload.agents.map((agent) => agent.tool), ["Claude Code", "Codex", "Cursor"]);
+  assert.equal(payload.agents[0].level, "hard-block");
+  assert.ok(payload.agents.slice(1).every((agent) => agent.level === "detect-and-repair"));
+});
+
 test("instructions audit separates observable violations, partial compliance, and influence-unknown rules", () => {
   const root = tempRepo();
   const codexHome = tempRepo();
