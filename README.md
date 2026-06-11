@@ -1174,3 +1174,4 @@ More docs:
 
 - [MCP setup and tools](docs/mcp.md)
 - [Live demo flow](docs/live-demo.md)
+- [Privacy & telemetry — exactly what leaves your machine](docs/privacy-telemetry.md)

@@ -87,6 +87,87 @@ test("denies the fourth identical bash command in a session", () => {
   assert.equal(enforce.decidePreToolUse(root, readEvent(root, "Bash", { command: "npm test" }, "session-2")), null);
 });
 
+test("a command that ever succeeded is never loop-blocked", () => {
+  const root = tempDir();
+  const enforce = enforceWith();
+  const pre = () => readEvent(root, "Bash", { command: "npm test" });
+  const post = (failed) => JSON.stringify({
+    session_id: "session-1",
+    cwd: root,
+    tool_name: "Bash",
+    tool_input: { command: "npm test" },
+    tool_response: { exit_code: failed ? 1 : 0 },
+  });
+
+  // First run succeeds; many later runs of the same command stay allowed.
+  assert.equal(enforce.decidePreToolUse(root, pre()), null);
+  enforce.decidePostToolUse(root, post(false));
+  for (let i = 0; i < 6; i += 1) {
+    assert.equal(enforce.decidePreToolUse(root, pre()), null);
+    enforce.decidePostToolUse(root, post(true));
+  }
+});
+
+test("three recorded failures block the next attempt", () => {
+  const root = tempDir();
+  const enforce = enforceWith();
+  const pre = () => readEvent(root, "Bash", { command: "pytest -q" });
+  const post = () => JSON.stringify({
+    session_id: "session-1",
+    cwd: root,
+    tool_name: "Bash",
+    tool_input: { command: "pytest -q" },
+    tool_response: { exit_code: 2 },
+  });
+
+  for (let i = 0; i < 3; i += 1) {
+    assert.equal(enforce.decidePreToolUse(root, pre()), null);
+    enforce.decidePostToolUse(root, post());
+  }
+  const denied = enforce.decidePreToolUse(root, pre());
+  assert.ok(denied);
+  assert.match(denied.hookSpecificOutput.permissionDecisionReason, /failed 3 times/);
+});
+
+test("unknown response shapes record nothing and keep the attempt fallback", () => {
+  const root = tempDir();
+  const enforce = enforceWith();
+  enforce.decidePostToolUse(root, JSON.stringify({
+    session_id: "session-1",
+    cwd: root,
+    tool_name: "Bash",
+    tool_input: { command: "npm test" },
+    tool_response: { someUnknownField: true },
+  }));
+  const pre = () => readEvent(root, "Bash", { command: "npm test" });
+
+  assert.equal(enforce.decidePreToolUse(root, pre()), null);
+  assert.equal(enforce.decidePreToolUse(root, pre()), null);
+  assert.equal(enforce.decidePreToolUse(root, pre()), null);
+  assert.ok(enforce.decidePreToolUse(root, pre()));
+});
+
+test("denials are counted with estimated tokens kept out", () => {
+  const root = tempDir();
+  writeBlocked(root, ["logs/**"]);
+  fs.mkdirSync(path.join(root, "logs"), { recursive: true });
+  fs.writeFileSync(path.join(root, "logs", "big.log"), "x".repeat(40_000), "utf8");
+  const enforce = enforceWith();
+
+  enforce.decidePreToolUse(root, readEvent(root, "Read", { file_path: path.join(root, "logs", "big.log") }));
+  const pre = () => readEvent(root, "Bash", { command: "npm run flaky" });
+  for (let i = 0; i < 4; i += 1) enforce.decidePreToolUse(root, pre());
+
+  const status = enforce.runEnforceStatus(root);
+  assert.equal(status.denials.total, 2);
+  assert.equal(status.denials.blockedContext, 1);
+  assert.equal(status.denials.loops, 1);
+  // 40kB file ≈ 10k tokens + 2k loop estimate.
+  assert.equal(status.denials.estimatedTokensSaved, 12_000);
+  const rendered = enforce.renderEnforceTerminal(status);
+  assert.match(rendered, /tokens kept out of context/);
+});
+
 test("fails open on malformed events", () => {
   const enforce = enforceWith();
   assert.equal(enforce.decidePreToolUse(tempDir(), "not json"), null);
