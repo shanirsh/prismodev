@@ -28,6 +28,7 @@ Repo identity (so the dashboard can group by project):
 | repo folder name | `prismodev` |
 | git remote, credentials stripped | `github.com/you/repo` |
 | current branch + short commit | `main`, `abc123def456` |
+| current branch's PR number + state, when the `gh` CLI is installed and authenticated | `#142, merged` |
 
 Per session (numbers and category labels only):
 
