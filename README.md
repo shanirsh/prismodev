@@ -4,1196 +4,141 @@
 [![npm downloads](https://img.shields.io/npm/dw/getprismo.svg)](https://www.npmjs.com/package/getprismo)
 [![license: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-an agent control plane for ai coding. it watches local coding agents, finds token waste, stages or executes safe interventions, verifies the fix against your next sessions in dollars, and escalates or backs off based on what actually worked. unattended.
+Agent control plane for AI coding.
+
+Prismo watches local Codex, Claude Code, and Cursor sessions, finds wasted agent context, applies safe interventions, and verifies whether those interventions actually saved tokens and dollars in later sessions.
+
+```bash
+npx getprismo protect
+```
+
+That one command turns on the useful stack for a repo:
+
+- safe ignore rules and compact context packs
+- Claude Code runtime enforcement when hooks are available
+- loop and context-waste protection
+- connector-driven repair and verification when connected to Prismo Cloud
+
+## Why
+
+AI coding agents waste real money and time on context that does not help them ship:
+
+- full test/build logs entering chat
+- lockfiles, build output, coverage, and caches getting read
+- the same files being opened again and again
+- retry loops that keep running the same failing command
+- long sessions carrying stale context across tasks
+
+Prismo turns those patterns into controls, then measures the result.
+
+## What Gets Measured
+
+The launch report is built around proof, not vibes:
+
+- **Verified saved**: tokens and dollars saved after later sessions prove waste dropped
+- **Live prevented**: estimated tokens blocked before they entered context
+- **Proactivity**: live detections, interventions, and loop stops while coding
+- **Still measuring**: interventions waiting for enough later sessions to verify impact
+- **Top cause**: the waste pattern causing the most damage
+
+```bash
+npx getprismo digest
+```
+
+Example output:
+
+```text
+Prismo controlled 21 AI coding session(s) over 7 day(s).
+Verified saved: ~0 tokens / $0.00.
+Live prevented: ~0 tokens / $0.00 estimated.
+Proactivity: 2 live control event(s), 65 intervention(s) or loop stop(s).
+Interventions: 65 completed, 0 verified improved, 3 still measuring.
+Context observed: 620,000 tokens; pre-control opportunity: ~286,000 tokens.
+Top cause: Tool-output floods (~286,000 tokens).
+```
+
+## Core Commands
+
+```bash
+npx getprismo doctor                 # diagnose and apply safe repo fixes
+npx getprismo protect                # one-command protection for this repo
+npx getprismo shield -- npm test     # keep noisy command output out of agent context
+npx getprismo enforce install        # Claude Code runtime context/loop enforcement
+npx getprismo agent --watch          # run the local repair/verification agent
+npx getprismo digest                 # launch report with verified savings
+```
+
+Full command docs: [docs/manual.md](docs/manual.md).
+
+## Cloud Connector
+
+Local-only mode works without login:
 
 ```bash
 npx getprismo doctor
+npx getprismo protect
 ```
 
-that's it. run it on any repo. no api keys, no login, no data leaves your machine. connect it once and it runs itself.
-
----
-
-## the problem
-
-ai coding agents (claude code, codex, cursor) burn tokens on things that don't help you ship. lockfiles get read into context. old logs get loaded. generated artifacts leak in. sessions balloon to millions of tokens because nothing tells the agent what to ignore.
-
-most developers don't realize this is happening until the bill arrives or the agent starts looping.
-
-prismodev gives you a control plane for it before, during, and after.
-
----
-
-## the loop
-
-prismodev covers the full AI coding session:
-
-```
-before you code     npx getprismo doctor
-while you code      npx getprismo guard --watch
-enforce at runtime  npx getprismo enforce install
-noisy commands      npx getprismo shield -- npm test
-targeted repairs    npx getprismo repair auto
-after you code      npx getprismo receipt
-postmortem          npx getprismo replay
-weekly receipt      npx getprismo digest
-workspace agent     npx getprismo agent --watch
-agent-native        npx getprismo mcp
-optional bridge     npx getprismo bridge
-```
-
-**doctor** diagnoses the repo, applies safe fixes, and shows the before/after score.
-**repair** runs the targeted fix for one waste cause; `repair auto` lets the planner pick.
-**enforce** turns the context firewall into actual runtime enforcement via Claude Code hooks.
-**digest** prints the launch report: verified saved tokens/dollars first, live prevention clearly labeled as estimated, ready to post or paste into Slack.
-**guard** runs live guardrails, context throttle, rescue prompts, context firewall, and dashboard-ready prevention events.
-**watch** monitors context pressure live and is the lower-level diagnostic view behind guard.
-**receipt** explains what repeated, what output dominated, what artifacts leaked, what likely influenced the run, and a heuristic context-efficiency score.
-**replay** reconstructs why a session went sideways and prints a recovery prompt.
-**shield** runs noisy commands without dumping full output back into the agent context.
-**agent** connects Prismo Cloud to your local repo so dashboard actions can safely run on this machine.
-**mcp** exposes PrismoDev as local tools so compatible agents can scan, search shield output, and request scoped context directly.
-**bridge** explains the optional tighter control layer for teams that want Prismo closer to the agent execution path.
-
----
-
-## new: the self-driving loop
-
-connect once and prismodev operates itself:
+Connect when you want the dashboard, repair queue, live control feed, verified savings, and fleet learning:
 
 ```bash
-npx getprismo connect --token <your prismo api key>
+npx getprismo connect --token <your Prismo API key>
+npx getprismo connector install
 ```
 
-from that point, on every machine running the connector:
+The connector syncs aggregate session telemetry, claims safe repairs, publishes live control events, and verifies impact against future sessions.
 
-1. **detect** — session telemetry syncs continuously; waste is attributed to one of five causes: repeated file reads, tool-output floods, generated artifacts, context loops, long-session buildup.
-2. **decide** — a local planner scores causes against thresholds, respects cooldowns, and won't re-repair a cause until enough new sessions arrived to judge the last attempt. the backend auto-queues repairs the same way — no dashboard clicks.
-3. **repair** — each cause has a dedicated executor (not doctor-for-everything): ignore rules + hot-file maps, shield staging, firewall policies, tightened guard budgets, scoped context packs with restart routines.
-4. **verify** — after a repair, the waste rate for that cause is measured in your *later* sessions (14-day baseline, real before/after math). verdicts: `improved`, `no-change`, `regressed`.
-5. **adapt** — `improved` stays mild. `no-change`/`regressed` escalates to an aggressive tier (context firewall + tighter budgets). a cause that fails both tiers is held for your review instead of being retried forever — the one moment a human is genuinely needed, surfaced loudly.
+## Privacy
 
-savings are reported in **dollars, verified** — converted with a model-aware blended rate weighted across your actual sessions — on the dashboard and via `prismo digest`.
+PrismoDev does **not** upload raw prompts, source code, stdout, stderr, or full command logs.
 
-and it learns across the fleet: anonymized repair verdicts (counts only, no repo/org identifiers) aggregate into priors, so when the fleet already knows mild repairs rarely fix a cause, your first repair starts at the tier that works. your own verdicts always outrank the fleet's.
+It syncs metadata needed for the control plane:
 
-run one planner cycle by hand to see it think:
+- repo identity and branch
+- tool name and session id
+- token totals and risk scores
+- top waste cause
+- intervention status
+- verified saved tokens/dollars
 
-```bash
-npx getprismo repair auto --dry-run
-```
+Detailed telemetry docs: [docs/privacy-telemetry.md](docs/privacy-telemetry.md).
 
----
+## Runtime Enforcement
 
-## new: runtime enforcement
-
-advisory guardrails only help if the agent reads them. for claude code, prismodev can enforce them:
+Claude Code can be hard-blocked through hooks:
 
 ```bash
 npx getprismo enforce install
 ```
 
-this wires a `PreToolUse` hook (with a backup of `.claude/settings.json`) that:
+This can deny blocked-context reads and repeated command loops before they spend tokens. Codex and Cursor are visible and repairable through logs, MCP, shield, and guardrails; universal hard-blocking for those agents requires wrapper or deeper pre-tool hooks.
 
-- **denies reads into blocked context** — `node_modules/`, build output, logs, lockfiles — with a reason pointing the agent at the compact `.prismo/` context packs instead
-- **denies the fourth attempt of an identical command** in one session, suggesting one shielded run instead of an expensive retry loop
+## Beta Test Loop
 
-```text
-permissionDecision: deny
-reason: Prismo context firewall: "logs/huge.log" is blocked context (rule: logs/**).
-        Use the .prismo/ context packs instead, or run `npx getprismo shield -- <command>`
-        if you need its contents summarized.
-```
-
-enforcement fails open — malformed events or missing policy files allow the call, so it can never break a working agent. `enforce uninstall` removes only the prismo hook. other agents keep following the advisory `.prismo` files.
-
----
-
-## new: optional bridge mode
-
-the background connector is the default. it observes local sessions, syncs safe aggregate telemetry, applies queued repairs, verifies the next sessions, and shows live events in the dashboard. it does not sit in front of every agent action.
-
-bridge mode is optional context for teams that want Prismo closer to the agent execution path, especially for live loop stopping:
+For the proof week:
 
 ```bash
-npx getprismo bridge
+npx getprismo protect
+npx getprismo connector status
+npx getprismo digest
 ```
 
-- **Claude Code**: hard-block capable today through `npx getprismo enforce install`, which adds a `PreToolUse` hook that can deny blocked-context reads and repeated command loops before they run.
-- **Codex**: visible and repairable through local session logs, guardrails, shield, and MCP. universal hard-blocking needs Codex to run through a wrapper/bridge or expose a pre-tool hook.
-- **Cursor**: visible and repairable through local telemetry and staged repairs. universal hard-blocking needs Cursor to run through a wrapper/bridge or expose a pre-tool hook.
+Then code normally. Do not optimize for the demo. Let Prismo observe real sessions, intervene where it can, and verify the savings later.
 
-that is why Prismo is not described as a proxy by default. connector mode is safer and simpler; bridge mode is the opt-in path when stronger live interception matters more than staying fully out of the agent execution path.
-
----
-
-## what prismodev catches
-
-- missing `.claudeignore` / `.cursorignore` (the biggest single fix for most repos)
-- lockfiles entering context (`package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`)
-- generated artifacts leaking in (`__pycache__`, `dist/`, `coverage/`, `.next/`)
-- operational source-stream dumps leaking in (`events/`, `source-streams/`, inbox/calendar/GitHub JSONL exports)
-- oversized instruction files (`CLAUDE.md` or `AGENTS.md` over 500 tokens)
-- tool output dominating sessions (repeated reads, large command output)
-- long-running sessions with stale context accumulation
-- repeated file reads (same file loaded 100+ times in one session)
-- repeated commands (agent running the same command in a loop)
-- high context risk sessions that should have been split at task boundaries
-- session-derived ignore candidates from actual Claude/Codex logs (`logs/debug.log`, `dist/app.js`, `package-lock.json`, source-stream dumps)
-
----
-
-## real output: doctor
-
-run `npx getprismo doctor` on any repo. here's what it looks like on a real project:
-
-```
-PrismoDev Doctor
-
-Before: 79/100 - Medium risk - 5 token leaks
-After:  91/100 - Low risk - 3 token leaks (+12)
-Local usage: 976k tokens across 3 recent session(s)
-Estimated exposed context reduction: 100%
-Payoff: repo is 12 points cleaner for AI coding sessions
-
-Fixed:
-- Created .claudeignore
-- Created .cursorignore
-- Generated prismo-dev-report.md
-- Generated .prismo/architecture-summary.md
-- Generated .prismo/recommended-CLAUDE.boilerplate.md
-- Generated .prismo/recommended-AGENTS.boilerplate.md
-- Generated .prismo/recommended-.claudeignore
-- Generated .prismo/recommended-.cursorignore
-- Generated .prismo/recommended-.gitignore-additions
-- Generated .prismo/backend-summary.md
-- Generated .prismo/frontend-summary.md
-
-Still Risky:
-- Tool output/context contributed about 319k tokens
-- 1 recent session reached high context risk
-
-Recommended starting context:
-.prismo/frontend-context.md
-
-Next:
-1. npx getprismo context frontend
-2. npx getprismo watch --once
-3. npx getprismo cc
-```
-
-doctor went from 79 to 91 in one run. the repo now has proper ignore files, compact context packs, and a clear starting point for the next coding session.
-
-`scan --usage` and `doctor` can also turn real session leaks into concrete ignore suggestions. if local Claude/Codex logs show `logs/debug.log`, `dist/app.js`, `package-lock.json`, source-stream dumps, or other noisy files repeatedly entering context, prismodev adds conservative `.claudeignore` / `.cursorignore` candidate rules instead of only reporting the problem.
-
-when you want PrismoDev to apply those ignore suggestions directly, use `npx getprismo doctor --apply-suggestions`. it appends only missing rules, writes `.claudeignore.prismo-backup` / `.cursorignore.prismo-backup` first, and still does not touch `CLAUDE.md`, `AGENTS.md`, `.gitignore`, or source code.
-
----
-
-## real output: watch
-
-run `npx getprismo watch` during a coding session. it monitors context pressure in real time:
-
-```
-Prismo Watch
-
-Context Pressure: HIGH
-Session Size: 707k tokens (exact-local-log)
-Recent Growth: +0 tokens
-Tool Output: 237k tokens
-Turns: 102  |  Tool calls: 774
-Model: gpt-5.5
-
-Warnings
-- Context risk is high; consider starting a fresh session.
-- Tool/output tokens are dominating this session.
-- lib/prismo-dev-scan.js appears repeatedly in context (286x).
-- node bin/prismo.js appears repeatedly in context (85x).
-- lockfiles likely entered active context (60 mentions).
-
-Do This Now
-Cause: tool-output-flood (high confidence)
-Tool/output tokens are dominating this session (237k tokens).
-1. Stop loading full logs or broad command output.
-2. Rerun failing commands with tight filters or short ranges.
-3. Ask the agent to summarize current errors before reading more files.
-Rescue: npx getprismo watch --rescue
-
-Signals
-- Repeated file: lib/prismo-dev-scan.js (286x)
-- Repeated file: node bin/prismo.js (85x)
-- Generated artifacts: lockfiles (60 mentions)
-- Generated artifacts: __pycache__ (47 mentions)
-
-Suggested Action
-Run: npx getprismo doctor
-```
-
-watch caught lockfiles entering context, a file being read 286 times, and tool output dominating the session. without this, you'd never know.
-
----
-
-## new: optimizer fit
-
-not every token optimizer solves the same bottleneck. before stacking compression proxies, repo packers, code indexes, and MCP tools, run:
+At the end:
 
 ```bash
-npx getprismo scan --optimizer-fit
+npx getprismo digest --days 7
 ```
 
-PrismoDev scores your actual repo/session signals and recommends the right path:
+Those lines are the launch post.
 
-```text
-Prismo Optimizer Fit
-
-Primary bottleneck: Generated artifacts / ignore cleanup: HIGH
-
-Bottlenecks
-- Generated artifacts / ignore cleanup: High
-  .claudeignore is missing
-- Oversized command/tool output: Medium
-  237k tool/output tokens found in local sessions
-- Repeated source exploration: Low
-  Repo/source exploration does not look like the main bottleneck
-
-Recommended Stack
-1. Apply safe ignore/context fixes first.
-   Run: npx getprismo doctor --apply-suggestions --dry-run
-   Category: ignore cleanup (.claudeignore, .cursorignore)
-2. Sandbox noisy command output before adding more code-indexing tools.
-   Run: npx getprismo shield -- <noisy command>
-   Category: output sandboxing (Prismo shield, context-mode, RTK, tokf, distill)
-```
-
-This makes PrismoDev the measure-first layer: it tells you whether you need ignore cleanup, output sandboxing, code indexing, repo packing, instruction trimming, session splitting, or MCP/tool hygiene.
-
-For the short version:
+## Development
 
 ```bash
-npx getprismo scan --report-card
+npm test
+node bin/prismo.js protect --json
+node bin/prismo.js digest --json
 ```
 
-That prints the simplest decision:
-
-```text
-PrismoDev Report Card
-
-Biggest waste: Generated artifacts / ignore cleanup: High
-Start with: npx getprismo doctor --apply-suggestions --dry-run
-Then: npx getprismo shield -- <noisy command>
-Code index needed: not yet
-Round-trip risk: Low
-```
-
-To benchmark a noisy command:
-
-```bash
-npx getprismo benchmark -- npm test
-npx getprismo benchmark session
-```
-
-`benchmark -- <command>` measures raw command output tokens versus the compact shield summary. `benchmark session` summarizes recent local Claude/Codex sessions, including round-trip context signals like tool calls, repeated commands, repeated source reads, and MCP/tool surface.
-
----
-
-## new: context shield
-
-if you know a command may dump huge output, run it through prismo:
-
-```bash
-npx getprismo shield -- npm test
-npx getprismo shield -- pytest -q
-npx getprismo shield -- npm run build
-```
-
-shield executes the command locally, stores full stdout/stderr under `.prismo/shield/runs/`, indexes the output in `.prismo/shield/shield.sqlite` using SQLite FTS5 when available, and prints only a compact summary plus useful error lines.
-
-this is the lightweight context-sandbox layer: the full output stays on disk until you explicitly inspect it, instead of being pasted into the model context and re-sent every turn.
-
-example:
-
-```text
-Prismo Shield
-
-Command: npm test
-Exit: 1
-Captured: 186 KB (~46,500 tokens kept out of chat)
-
-Full Output Stored:
-- .prismo/shield/runs/2026-05-20T.../stdout.txt
-- .prismo/shield/runs/2026-05-20T.../stderr.txt
-- .prismo/shield/shield.sqlite
-
-Summary Returned To Context:
-- ERROR: auth.test.ts expected 200 received 401
-- FAIL src/auth/session.test.ts
-```
-
-search previous shield output without reloading whole logs:
-
-```bash
-npx getprismo shield last
-npx getprismo shield search "auth expected 200"
-npx getprismo shield search "AUTH_FAILURE" --json
-```
-
-when `watch` detects tool-output floods or repeated command loops, it now recommends this flow directly:
-
-```text
-Shield Plan
-Run: npx getprismo shield -- <noisy command>
-Then: npx getprismo shield search "<error text>"
-MCP: prismo_shield_run -> prismo_shield_search
-```
-
-this is intentionally not magic interception yet. it is a safe local-first primitive you can tell agents to use for noisy commands.
-
----
-
-## workspace agent
-
-Prismo Cloud can guide the work from the dashboard, but your repo still lives on your machine. `agent` is the local bridge.
-
-```bash
-npx getprismo connect --token <your Prismo API key>
-npx getprismo agent --watch
-```
-
-After that, the Prismo workspace can queue safe actions like `doctor`, `sync`, `guard`, `context`, `optimize`, and allowlisted `shield` commands. The local agent claims those actions, executes them in the selected repo, and reports the status back to Prismo Cloud.
-
-This keeps the product flow simple:
-
-```text
-dashboard recommends fix -> local agent runs safe command -> dashboard refreshes with the result
-```
-
-`agent` does not upload prompts, source code, file contents, stdout, stderr, or full command logs. It uploads action status and safe aggregate metrics. Cloud actions are intentionally limited; arbitrary shell commands and shell metacharacters are rejected.
-
-For CI-style polling or debugging, run one pass:
-
-```bash
-npx getprismo agent --once
-npx getprismo agent --once --json
-```
-
----
-
-## new: live guardrails mode
-
-the easiest proactive mode is guard:
-
-```bash
-npx getprismo connect --token <your Prismo API key>
-npx getprismo guard --watch
-```
-
-`guard` packages the local prevention loop: live guardrails, context throttling, context firewall updates, guard event history, and dashboard-ready prevention events. it never uploads prompts, source code, file contents, stdout, stderr, or full command logs.
-
-run it once for a snapshot:
-
-```bash
-npx getprismo guard
-npx getprismo guard --json
-npx getprismo guard --no-sync
-```
-
-the lower-level watch mode is:
-
-```bash
-npx getprismo watch --auto
-```
-
-`--auto` turns on live guardrails, live context throttling, event logging, and a default 600k session budget. it writes:
-
-```text
-.prismo/live-guardrails.md
-.prismo/live-context-throttle.md
-.prismo/live-rescue-prompt.md
-.prismo/watch-events.jsonl
-```
-
-if you want prismodev to keep updating instructions while the session runs, use:
-
-```bash
-npx getprismo watch --guardrails
-```
-
-this writes and continuously updates:
-
-```text
-.prismo/live-guardrails.md
-.prismo/live-rescue-prompt.md
-```
-
-the idea is simple: tell your coding agent once at the start of the session:
-
-```text
-follow .prismo/live-guardrails.md during this session.
-```
-
-then keep `watch --guardrails` running. when prismodev detects tool-output floods, artifact leaks, repeated reads, loops, or context spikes, it updates the guardrails file with the current issue and the exact behavior the agent should follow next.
-
-example guardrails:
-
-```md
-# Prismo Live Guardrails
-
-Context pressure: High
-Current issue: tool-output-flood
-Confidence: high
-
-## Effective Immediately
-
-- Stop loading full logs or broad command output.
-- Rerun failing commands with tight filters or short ranges.
-- Ask the agent to summarize current errors before reading more files.
-- Do not read generated artifacts, lockfiles, caches, build output, coverage, or logs unless explicitly required.
-```
-
-this does not secretly control claude code or codex internals. it gives the agent a live-updating instruction file to follow, which is the safest local-first way to reduce token waste without requiring an IDE extension or agent plugin.
-
----
-
-## new: live rescue mode
-
-when `watch` detects a session going sideways, run:
-
-```bash
-npx getprismo watch --rescue
-```
-
-it prints a paste-ready rescue prompt for the current ai coding session:
-
-```text
-Prismo Rescue Prompt
-
-Paste this into the current AI coding session:
-
-We are in a high-context AI coding session. Stop broad exploration and recover state before doing more work.
-
-Current Prismo signal: tool-output-flood (high confidence).
-Summary: Tool/output tokens are dominating this session (264k tokens).
-Context pressure: High. Session size: 1.11M tokens. Tool output: 264k tokens.
-
-Do this now:
-1. Stop loading full logs or broad command output.
-2. Rerun failing commands with tight filters or short ranges.
-3. Ask the agent to summarize current errors before reading more files.
-
-Before reading or editing anything else, summarize:
-- files changed so far
-- exact failing command or error
-- current hypothesis
-- next smallest file/test to inspect
-
-Do not re-read these files unless they changed.
-Do not read generated/noisy artifacts unless explicitly required.
-```
-
-`watch --rescue --json` includes the same prompt as `rescuePrompt`, plus the structured live action:
-
-```json
-{
-  "live": {
-    "contextPressure": "High",
-    "liveAction": {
-      "cause": "tool-output-flood",
-      "confidence": "high",
-      "summary": "Tool/output tokens are dominating this session.",
-      "rescueAvailable": true
-    }
-  }
-}
-```
-
-live action causes include:
-
-- `tool-output-flood`
-- `artifact-leak`
-- `possible-loop`
-- `repeated-file-read`
-- `context-spike`
-- `high-context-pressure`
-
-this is the proactive part of prismodev: it does not just tell you something is expensive. it tells you what to do **right now** while the session is still recoverable.
-
-use `--guardrails` when you want files to update automatically during the session. use `--rescue` when you want a one-shot prompt to paste immediately.
-
----
-
-## new: live context throttle
-
-if you want prismodev to enforce a session budget while you work, run:
-
-```bash
-npx getprismo watch --throttle --budget 600k
-```
-
-this writes:
-
-```text
-.prismo/live-context-throttle.md
-```
-
-when the active session gets near or crosses the budget, watch turns that into a live action:
-
-```text
-Cause: token-budget-exceeded
-Stop broad exploration.
-Summarize current state before more file reads.
-Start a fresh scoped session at the next task boundary.
-```
-
-use it with guardrails for the most proactive setup:
-
-```bash
-npx getprismo watch --auto
-```
-
-that gives the agent a live instruction file, a rescue prompt, and a stricter context throttle file that updates as the session changes.
-
-`watch --auto` also appends changed live warnings to `.prismo/watch-events.jsonl`, so expensive-session events can be reused later in postmortems.
-
-Use `--no-events` when you want live protection without writing session event history:
-
-```bash
-npx getprismo watch --auto --no-events
-```
-
----
-
-## new: context firewall
-
-generate a scoped context policy before a task:
-
-```bash
-npx getprismo firewall auth-bug
-```
-
-this writes:
-
-```text
-.prismo/context-firewall.md
-.prismo/allowed-context.txt
-.prismo/blocked-context.txt
-.prismo/firewall-prompt.md
-```
-
-the firewall tells the agent what it should read first and what it should avoid unless it explains why. this is the prevention layer: instead of only warning after context bloat happens, prismodev gives the agent a smaller context boundary up front.
-
-example:
-
-```text
-Allowed first:
-- .prismo/architecture-summary.md
-- .prismo/backend-summary.md
-- backend/app/*/auth/*
-
-Blocked unless justified:
-- node_modules/**
-- .next/**
-- dist/**
-- coverage/**
-- package-lock.json
-```
-
-`watch --auto` also updates `.prismo/context-firewall.md` when it detects live waste, so the active session gets a tighter context policy as pressure rises.
-
----
-
-## real output: cc timeline
-
-run `npx getprismo cc timeline` after a session to understand what happened:
-
-```
-Prismo Claude Code Cost
-
-Session: 7689982e-42a3-44fb-9734-2588e5e01145
-Model: claude-opus-4-6
-
-Timeline
-05:24 PM  Generated artifact likely entered context  package-lock.json (2x)
-05:24 PM  Generated artifact likely entered context  logs/debug-output.json (1x)
-05:24 PM  Repeated file/path context  CLAUDE.md (8x)
-05:24 PM  Repeated file/path context  AGENTS.md (8x)
-05:24 PM  Repeated file/path context  node bin/prismo.js (6x)
-
-Suggested Action
-Run npx getprismo optimize, then start from .prismo/architecture-summary.md.
-```
-
-timeline shows exactly what leaked, what repeated, and what to do differently next time.
-
-to turn a postmortem into a safer next-session policy, run:
-
-```bash
-npx getprismo cc timeline --firewall --task auth-bug
-```
-
-this writes `.prismo/timeline-firewall-suggestions.md`, `.prismo/context-firewall.suggested.md`, `.prismo/allowed-context.suggested.txt`, and `.prismo/blocked-context.suggested.txt` from the latest session evidence. it does not overwrite your active firewall; it gives you a per-task allow/block recommendation for the next session.
-
----
-
-## how doctor improves a repo
-
-doctor does four things in sequence:
-
-1. **scans** the repo and reads local codex/claude code session logs
-2. **applies safe fixes** — creates `.claudeignore`, `.cursorignore`, generates recommendation templates
-3. **generates context packs** — compact `.prismo/` files that give agents focused context instead of reading everything
-4. **re-scans** and shows the before/after score
-
-what doctor creates:
-
-```
-.claudeignore                              blocks waste from claude code
-.cursorignore                              blocks waste from cursor
-.prismo/architecture-summary.md            compact project overview for agents
-.prismo/backend-summary.md                 backend-specific context
-.prismo/frontend-summary.md                frontend-specific context
-.prismo/recommended-CLAUDE.boilerplate.md              CLAUDE.md boilerplate reference; do not overwrite curated files
-.prismo/recommended-AGENTS.boilerplate.md              AGENTS.md boilerplate reference; do not overwrite curated files
-.prismo/recommended-.claudeignore          full recommended ignore list
-.prismo/recommended-.cursorignore          full recommended ignore list
-.prismo/recommended-.gitignore-additions   things your gitignore might be missing
-prismo-dev-report.md                       full diagnostic report
-```
-
-if an existing `.claudeignore` or `.cursorignore` already covers prismo's recommendations, doctor skips the suggested ignore file instead of creating redundant noise. the default recommendations include common project state, local db, export, credential, and token patterns such as `*_state.json`, `*_tokens.json`, `*_export.json`, `*.sqlite`, `models/`, and `state-backups/`.
-
-backend and frontend summaries include load-bearing candidates ranked by import references, text-reference signals, recent git touches when available, and file size, not just directory listings.
-
-prismo also flags source-stream dumps separately from normal build artifacts. large inbox/calendar/github/event payload files are treated as operational noise because they often get summarized once, written near the repo, and then accidentally re-read by later coding sessions.
-
-what doctor never touches:
-
-- your real `CLAUDE.md`
-- your real `AGENTS.md`
-- your `.gitignore`
-- any source code
-- any config files
-
-it only creates new files and recommendations. you decide what to apply.
-
----
-
-## cursor session tracking
-
-prismodev now reads cursor's local sqlite databases directly. cursor stores data differently from claude code and codex, no jsonl session logs, but it has its own tracking databases with unique data.
-
-```bash
-npx getprismo cursor                     # summary of all cursor sessions
-npx getprismo cursor list                # list composer sessions with modes and models
-npx getprismo cursor authorship          # ai vs human code authorship from scored commits
-npx getprismo cursor timeline            # timeline of ai activity across commits and files
-npx getprismo cursor files               # ai-generated and ai-deleted file tracking
-npx getprismo cursor --json              # machine-readable output
-```
-
-cursor tracks something claude code and codex can't: per-commit ai authorship. every commit is scored with how many lines came from composer (agent), tab completions, and human typing. prismodev surfaces this as an authorship percentage.
-
-```
-AI Authorship (from Cursor scored commits)
-
-Commits analyzed: 47
-Total lines added: 3812
-
-  Composer (agent):  2104 lines
-  Tab completions:   891 lines
-  Human:             817 lines
---------------------------------------------------
-  AI authorship:     78%
-```
-
-prismodev also tracks ai-generated files cursor is watching, files cursor deleted, conversation summaries, and model usage distribution across sessions.
-
-what cursor can't do vs claude code: cursor doesn't expose per-message token counts, exact api costs, or full conversation transcripts in its local data. that means live context pressure, loop detection, exact cost breakdowns, cache savings analysis, and shield don't apply the same way. this is a cursor limitation. prismodev gets about 60-65% feature parity with cursor compared to claude code/codex.
-
-what cursor gives you that the others don't: ai authorship percentages per commit, tab vs composer vs human line counts, conversation summaries with tldr, and ai-generated file tracking with churn detection.
-
-the `prismo_cursor_sessions` mcp tool exposes all of this to compatible agents.
-
-`scan` and `doctor` now detect cursor's tracking database automatically and flag ai-generated files still present in the repo.
-
----
-
-## run receipts and incident replay
-
-`receipt` turns recent local sessions into a plain-English run receipt:
-
-```bash
-npx getprismo receipt
-npx getprismo receipt codex --json
-```
-
-it summarizes repeated reads, generated artifacts, tool-output floods, repeated commands, likely influence, and the next scoped action to take. it also reports a heuristic context-efficiency metric: decision/progress signals per 1k tokens, with drag factors such as repeated reads, artifact leaks, tool-output floods, and command loops.
-
-`replay` is the postmortem view:
-
-```bash
-npx getprismo replay
-```
-
-it classifies the incident pattern, explains what happened, and prints a recovery prompt for the next agent run.
-
-`timeline` looks across many sessions instead of one:
-
-```bash
-npx getprismo timeline --last 20
-```
-
-it surfaces recurring waste patterns such as the same lockfile leaking into many sessions, the same source file being repeatedly reread, or several sessions crossing high context pressure.
-
-`instructions audit` looks at persistent rules:
-
-```bash
-npx getprismo instructions audit
-npx getprismo instructions ablate --dry-run
-npx getprismo instructions apply --dry-run
-```
-
-it scores rules in `CLAUDE.md`, `AGENTS.md`, `.codex/AGENTS.md`, `.codex/instructions.md`, and `.openai/instructions.md`, then separates observable violations, partial compliance, duplicated rules, trim candidates, and influence-unknown rules. `instructions ablate --dry-run` creates a conservative ablation plan with candidates, sample-count guidance, rollback notes, and variance warnings; it does not edit files. `instructions apply` safely removes exact duplicate instruction lines only, writes backups first, and leaves uncertain rules as recommendations.
-
-`boundaries` checks parallel-agent isolation:
-
-```bash
-npx getprismo boundaries
-```
-
-it reports whether visible local agents are overlapping on the same files, leaking the same artifacts, or running noisy sessions that should move into shield or separate worktrees.
-
----
-
-## how watch catches waste live
-
-watch reads local session logs from codex, claude code, and cursor. it detects:
-
-| signal | what it means |
-|--------|--------------|
-| context pressure HIGH | session is consuming too many tokens |
-| repeated file 286x | agent keeps re-reading the same file |
-| lockfiles entered context | `package-lock.json` got loaded (pure waste) |
-| tool output dominating | agent output is larger than actual code context |
-| loop suspicion | agent may be stuck in a command loop |
-| recent growth +380k | context just spiked by 380k tokens |
-
-watch tells you the single most useful action to take right now. usually: start a fresh session, or switch to a scoped context pack.
-
-if you run multiple agents in the same repo, use:
-
-```bash
-npx getprismo watch --agents
-```
-
-multi-agent watch shows every visible local Codex/Claude Code session for the repo, ranks each agent by context pressure, and flags coordination risks like two agents repeatedly loading the same file, shared artifact leaks, multiple high-pressure sessions, or agents that should move noisy commands into `shield`.
-
-the same multi-agent coordination signal is included in `usage --json`, `scan --usage --json`, doctor output, and the generated markdown report whenever multiple local sessions are visible for the repo.
-
-`watch --rescue` prints a paste-ready prompt for the active coding session. use it when the agent is looping, reading too many files, or flooding context with logs:
-
-```bash
-npx getprismo watch --rescue
-```
-
-the rescue prompt tells the agent to stop broad exploration, summarize changed files and current failures, avoid noisy artifacts, and continue from the next smallest useful file/test.
-
-watch is tuned for large repos:
-
-- ignores absolute paths outside the target repo
-- keeps generated artifacts out of repeated-source-file actions
-- groups lockfiles, `__pycache__`, `node_modules`, and hashed build assets separately
-- only treats repeated non-generated files as actionable when they exist inside the target repo
-
-this keeps large-repo output focused on real source context instead of path noise from old logs or unrelated projects.
-
----
-
-## quick start
-
-```bash
-# see what prismodev does without touching anything
-npx getprismo demo
-
-# simple plain-english check
-npx getprismo scan --simple
-
-# the full workflow
-npx getprismo doctor
-npx getprismo watch --once
-npx getprismo receipt
-npx getprismo replay
-```
-
-if you don't have node installed, get it from [nodejs.org](https://nodejs.org) (LTS). then:
-
-```bash
-node -v   # should print 18+
-npx getprismo doctor
-```
-
-no install needed. npx runs it directly.
-
----
-
-## all commands
-
-| command | what it does |
-|---------|-------------|
-| `doctor` | diagnose, fix, optimize, show before/after |
-| `repair <cause\|auto>` | targeted repair for one waste cause; auto = planner picks with cooldowns and verdict feedback |
-| `enforce` | runtime enforcement of the context firewall via claude code hooks |
-| `digest` | verified-savings summary for the week, in dollars, ready for slack |
-| `watch` | live session monitoring with warnings |
-| `cc` | claude code cost breakdown |
-| `cc timeline` | session reconstruction with events |
-| `cursor` | cursor session tracking and ai authorship |
-| `receipt` | run receipt for reads, repeats, output, artifacts, context efficiency, likely influence, and next-run scope |
-| `replay` | incident replay with root cause and recovery prompt |
-| `timeline` | recurring context-waste patterns across recent sessions |
-| `instructions audit` | instruction ROI audit for CLAUDE.md / AGENTS.md violations, partial compliance, duplicates, and influence-unknown rules |
-| `instructions ablate --dry-run` | conservative ablation plan for instruction candidates without editing files |
-| `instructions apply` | safely dedupe exact duplicate instruction lines with backups |
-| `boundaries` | multi-agent boundary check for shared files/artifacts and worktree overlap |
-| `scan --usage` | full repo scan with local usage data |
-| `scan --optimizer-fit` | recommend which token-optimization path fits your repo/session |
-| `scan --report-card` | shortest decision-layer summary |
-| `benchmark` | measure command-output reduction or recent session round-trip context |
-| `scan --simple` | plain-english summary |
-| `scan --fix` | create safe fix files |
-| `scan --ci` | fail CI when token-risk gates fail |
-| `optimize` | generate `.prismo/` context packs |
-| `context` | print paste-ready prompt for agents |
-| `shield` | run noisy commands while keeping full output out of chat |
-| `agent` | claim and execute safe Prismo Cloud workspace actions locally |
-| `mcp` | expose PrismoDev tools over local MCP stdio |
-| `bridge` | explain optional bridge mode and live interception levels for Claude Code, Codex, and Cursor |
-| `setup` | detect tools, logs, proxy readiness |
-| `usage` | show raw session token usage |
-| `init` | add npm scripts and .prismo/README.md |
-| `demo` | sample output without reading your repo |
-
----
-
-## doctor modes
-
-```bash
-npx getprismo doctor                     # full run
-npx getprismo firewall auth-bug          # generate scoped context firewall
-npx getprismo doctor --dry-run           # preview without writing files
-npx getprismo doctor --apply-ignores-only # only create ignore files
-npx getprismo doctor --apply-suggestions # append missing ignore suggestions with backups
-npx getprismo doctor --apply-suggestions --dry-run # preview the exact ignore-rule diff
-npx getprismo doctor --no-context-packs  # skip .prismo/ generation
-npx getprismo doctor frontend            # scope to frontend
-npx getprismo doctor --json              # machine-readable output
-```
-
----
-
-## watch modes
-
-```bash
-npx getprismo guard                     # proactive local guard snapshot
-npx getprismo guard --watch             # keep guardrails active and sync prevention events
-npx getprismo guard --no-sync           # keep all guard events local
-npx getprismo guard --dry-run           # preview guard actions without writing state
-npx getprismo guard --json              # dashboard-ready guard payload
-```
-
-```bash
-npx getprismo watch                      # live refresh
-npx getprismo watch --once               # single snapshot
-npx getprismo watch --agents             # multi-agent coordination view
-npx getprismo watch --agents --json      # machine-readable multi-agent state
-npx getprismo watch --once --report      # write .prismo/watch-report.md
-npx getprismo watch --once --json        # machine-readable
-npx getprismo watch --auto               # guardrails + throttle + 600k budget
-npx getprismo watch --auto --no-events   # live protection without event history
-npx getprismo watch --guardrails         # update .prismo/live-guardrails.md continuously
-npx getprismo watch --guardrails --json  # include guardrailsPath and rescuePath
-npx getprismo watch --throttle --budget 600k # enforce a live context budget
-npx getprismo watch --events             # append changed warnings to .prismo/watch-events.jsonl
-npx getprismo watch --rescue             # paste-ready live-session rescue prompt
-npx getprismo watch --rescue --json      # include rescuePrompt in JSON
-npx getprismo watch --once --redact-paths # hide local paths
-npx getprismo watch codex                # only codex sessions
-npx getprismo watch claude               # only claude code sessions
-npx getprismo watch cursor               # only cursor sessions
-```
-
-### shield mode
-
-```bash
-npx getprismo shield -- npm test
-npx getprismo shield -- pytest -q
-npx getprismo shield --json -- npm run build
-npx getprismo shield last
-npx getprismo shield search "auth failure"
-```
-
-### workspace agent mode
-
-```bash
-npx getprismo agent                      # claim queued workspace actions once
-npx getprismo agent --watch              # keep polling Prismo Cloud for safe actions
-npx getprismo agent --interval 15        # poll every 15 seconds
-npx getprismo agent --limit 3            # claim up to 3 actions per poll
-npx getprismo agent --json               # machine-readable action result
-npx getprismo agent /path/to/repo         # run actions against a specific repo
-```
-
-### mcp mode
-
-```bash
-npx getprismo mcp
-npx getprismo mcp /path/to/repo
-```
-
-`mcp` starts a local stdio MCP server for agent clients. It exposes:
-
-- `prismo_scan`
-- `prismo_doctor_dry_run`
-- `prismo_watch_snapshot`
-- `prismo_multi_agent_watch`
-- `prismo_shield_run`
-- `prismo_shield_search`
-- `prismo_shield_last`
-- `prismo_context_pack`
-- `prismo_firewall`
-- `prismo_cc_timeline`
-- `prismo_cursor_sessions`
-- `prismo_receipt`
-- `prismo_instructions_audit`
-- `prismo_instructions_ablate`
-- `prismo_timeline`
-- `prismo_replay`
-- `prismo_boundaries`
-
-This lets an MCP-compatible agent search prior shielded test/build output, request scoped context packs, inspect token-waste signals, or coordinate multiple local agents without pasting giant logs into the conversation.
-
-Generic MCP client config:
-
-```json
-{
-  "mcpServers": {
-    "prismodev": {
-      "command": "npx",
-      "args": ["-y", "getprismo", "mcp", "/path/to/your/repo"]
-    }
-  }
-}
-```
-
-For local development from this repo:
-
-```json
-{
-  "mcpServers": {
-    "prismodev": {
-      "command": "node",
-      "args": ["/path/to/prismodev/bin/prismo.js", "mcp", "/path/to/your/repo"]
-    }
-  }
-}
-```
-
----
-
-## cc modes
-
-```bash
-npx getprismo cc                         # latest session cost
-npx getprismo cc timeline                # event timeline for latest session
-npx getprismo cc timeline --firewall --task auth-bug # suggest next-session firewall rules
-npx getprismo cc list                    # list recent sessions
-npx getprismo cc last 5                  # last 5 sessions
-npx getprismo cc all                     # everything
-npx getprismo cc timeline --json         # machine-readable timeline
-```
-
----
-
-## ci integration
-
-```bash
-npx getprismo scan --ci --no-report
-```
-
-exits non-zero when:
-- score is below threshold
-- risk is too high
-- ai ignore files are missing
-- generated artifacts are exposed
-- large files are exposed
-
-add to your ci:
-
-```json
-{
-  "scripts": {
-    "ai:ci": "prismo scan --ci --no-report"
-  }
-}
-```
-
----
-
-## scoped context packs
-
-prismodev generates context packs scoped to different areas of your codebase:
-
-```bash
-npx getprismo optimize frontend
-npx getprismo optimize backend
-npx getprismo optimize auth
-npx getprismo context frontend          # prints a paste-ready prompt
-npx getprismo context backend
-```
-
-use these as the starting point for coding sessions instead of letting agents explore the whole repo.
-
----
-
-## tracking modes
-
-```
-local scan        heuristic repo/context risk, no keys needed
-local logs        exact when codex/claude session logs expose token fields
-prismo proxy      exact usage/cost when traffic routes through prismo base url
-```
-
-prismodev reads local session data from:
-- codex: `~/.codex/sessions/**/*.jsonl`
-- claude code: `~/.claude/projects/**/*.jsonl`
-- cursor: `~/.cursor/ai-tracking/ai-code-tracking.db` and `~/Library/Application Support/Cursor/User/globalStorage/state.vscdb`
-
-no api keys. no intercepted prompts. no data uploaded.
-
----
-
-## what gets generated
-
-```
-.prismo/
-├── architecture-summary.md
-├── backend-summary.md
-├── frontend-summary.md
-├── frontend-context.md
-├── backend-context.md
-├── recommended-CLAUDE.boilerplate.md
-├── recommended-AGENTS.boilerplate.md
-├── recommended-.claudeignore
-├── recommended-.cursorignore
-├── recommended-.gitignore-additions
-├── optimize-report.md
-└── watch-report.md (when using --report)
-```
-
-all recommendation files. nothing is overwritten. you decide what to use.
-
----
-
-## init (npm project setup)
-
-```bash
-npx getprismo init
-```
-
-adds to your `package.json`:
-
-```json
-{
-  "scripts": {
-    "ai:doctor": "prismo doctor",
-    "ai:watch": "prismo watch",
-    "ai:context": "prismo context",
-    "ai:scan": "prismo scan --usage"
-  }
-}
-```
-
-then your team can run `npm run ai:doctor` without remembering the full command.
-
----
-
-## philosophy
-
-- local first. nothing leaves your machine.
-- safe by default. doctor never overwrites your real config files.
-- exact when possible. reads real session logs when agents expose them.
-- honest about limits. uses "likely" and "estimate" language when visibility is limited.
-- one suggested action. every output ends with the single best thing to do next.
-
----
-
-## works with
-
-- claude code (subscription and api modes)
-- openai codex
-- cursor
-- any tool that respects `.claudeignore` or `.cursorignore`
-- any repo (node, python, go, rust, vue, svelte, astro, monorepos, whatever)
-
----
-
-## internal layout
-
-```
-lib/prismo-dev-scan.js           cli entry and command dispatch
-lib/prismo-dev/constants.js      shared defaults, pricing, patterns
-lib/prismo-dev/context-optimize.js  context packs, scoped prompts
-lib/prismo-dev/boundaries.js     multi-agent boundary and worktree overlap checks
-lib/prismo-dev/doctor.js         doctor/dev/init orchestration
-lib/prismo-dev/fixes.js          safe ignore/template generation
-lib/prismo-dev/instructions.js   instruction ROI, partial-compliance, and ablation planning
-lib/prismo-dev/mcp.js            local MCP server and Prismo tool bindings
-lib/prismo-dev/receipt.js        run receipts for reads, output, artifacts, and next scope
-lib/prismo-dev/report.js         terminal, markdown, ci reports
-lib/prismo-dev/repair-executors.js  cause-specific repair executors with mild/aggressive tiers
-lib/prismo-dev/repair-planner.js    autonomous planner: cause scoring, cooldowns, local verdicts, escalation
-lib/prismo-dev/enforce.js        claude code PreToolUse hook enforcement and settings wiring
-lib/prismo-dev/replay.js         incident replay and recovery prompts
-lib/prismo-dev/scan.js           repo scanning, scoring, readiness
-lib/prismo-dev/scan-path-utils.js scan ignore/path helper logic
-lib/prismo-dev/shield.js         local command shield and searchable output index
-lib/prismo-dev/timeline.js       recurring multi-session waste patterns
-lib/prismo-dev/usage-cost.js     Claude Code cost and timeline analysis
-lib/prismo-dev/usage-log-utils.js local session log parsing helpers
-lib/prismo-dev/cursor-sessions.js Cursor SQLite session and authorship tracking
-lib/prismo-dev/usage-sessions.js local Codex/Claude/Cursor session discovery
-lib/prismo-dev/usage-watch.js    watch orchestration, JSON payloads, live files
-lib/prismo-dev/utils.js          shared terminal/file/token helpers
-lib/prismo-dev/watch-live.js     live context-pressure decisions
-lib/prismo-dev/watch-render.js   watch terminal and guardrail renderers
-```
-
----
-
-## help
-
-```bash
-npx getprismo --help
-npx getprismo --version
-npx getprismo doctor --help
-npx getprismo repair --help
-npx getprismo enforce --help
-npx getprismo bridge --help
-npx getprismo watch --help
-npx getprismo shield --help
-npx getprismo mcp --help
-npx getprismo mcp doctor
-npx getprismo cc --help
-npx getprismo cursor --help
-npx getprismo receipt --help
-npx getprismo replay --help
-npx getprismo timeline --help
-npx getprismo instructions --help
-npx getprismo boundaries --help
-npx getprismo scan --help
-```
-
-More docs:
-
-- [MCP setup and tools](docs/mcp.md)
-- [Live demo flow](docs/live-demo.md)
-- [Privacy & telemetry — exactly what leaves your machine](docs/privacy-telemetry.md)
+More docs: [docs/README.md](docs/README.md).

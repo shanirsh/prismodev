@@ -515,7 +515,7 @@ test("agent sends heartbeat on each poll cycle", async () => {
   }
 });
 
-test("agent publishes Claude loop stops and Codex/Cursor loop detections as live events", async () => {
+test("agent publishes Claude enforcement blocks and agent loop signals as live events", async () => {
   const liveEvents = [];
   const { server, url } = await createServer(async (req, res) => {
     if (req.method === "POST" && req.url === "/v1/dev/workspace/heartbeat") {
@@ -552,6 +552,15 @@ test("agent publishes Claude loop stops and Codex/Cursor loop detections as live
         estimatedTokensSaved: 2000,
         sessionId: "claude-session",
       }],
+      contextBlocks: [{
+        eventId: "claude-block-1",
+        at: "2026-06-11T18:00:30Z",
+        tool: "claude-code",
+        target: "logs/big.log",
+        rule: "logs/**",
+        estimatedTokensSaved: 10000,
+        sessionId: "claude-session",
+      }],
     }), "utf8");
 
     const agent = agentWith({
@@ -580,7 +589,9 @@ test("agent publishes Claude loop stops and Codex/Cursor loop detections as live
 
     const eventTypes = liveEvents.map((event) => event.eventType);
     assert.ok(eventTypes.includes("loop_stopped"));
+    assert.ok(eventTypes.includes("context_blocked"));
     assert.equal(liveEvents.find((event) => event.eventType === "loop_stopped").phase, "stopped");
+    assert.equal(liveEvents.find((event) => event.eventType === "context_blocked").tokensPrevented, 10000);
     assert.equal(liveEvents.filter((event) => event.eventType === "loop_detected").length, 2);
     assert.ok(liveEvents.some((event) => /Codex loop pattern/.test(event.headline)));
     assert.ok(liveEvents.some((event) => /Cursor loop pattern/.test(event.headline)));

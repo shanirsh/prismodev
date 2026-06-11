@@ -170,6 +170,11 @@ test("denials are counted with estimated tokens kept out", () => {
   assert.equal(status.denials.loops, 1);
   // 40kB file ≈ 10k tokens + 2k loop estimate.
   assert.equal(status.denials.estimatedTokensSaved, 12_000);
+  const state = JSON.parse(fs.readFileSync(path.join(root, ".prismo", "enforce-state.json"), "utf8"));
+  assert.equal(state.contextBlocks.length, 1);
+  assert.equal(state.contextBlocks[0].target, "logs/big.log");
+  assert.equal(state.contextBlocks[0].rule, "logs/**");
+  assert.equal(state.contextBlocks[0].estimatedTokensSaved, 10_000);
   const rendered = enforce.renderEnforceTerminal(status);
   assert.match(rendered, /tokens kept out of context/);
 });

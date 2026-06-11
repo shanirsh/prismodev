@@ -90,6 +90,37 @@ test("bridge command explains optional live interception levels", () => {
   assert.ok(payload.agents.slice(1).every((agent) => agent.level === "detect-and-repair"));
 });
 
+test("protect command enables local protection even before cloud connect", () => {
+  const root = tempRepo();
+  fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ scripts: { test: "node test.js" } }), "utf8");
+  fs.writeFileSync(path.join(root, "CLAUDE.md"), "short instructions\n", "utf8");
+
+  const result = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "protect", "--json", root],
+    {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        PRISMO_HOME: path.join(root, ".home"),
+        PRISMO_CLAUDE_HOME: path.join(root, "none"),
+        PRISMO_CODEX_HOME: path.join(root, "none"),
+        PRISMO_CURSOR_HOME: path.join(root, "none"),
+        PRISMO_CURSOR_APP_SUPPORT: path.join(root, "none"),
+      },
+    }
+  );
+
+  assert.equal(result.status, 0, result.stderr);
+  const payload = JSON.parse(result.stdout);
+  assert.equal(payload.command, "protect");
+  assert.ok(payload.steps.some((step) => step.step === "doctor" && step.ok));
+  assert.ok(payload.steps.some((step) => step.step === "enforce" && step.ok));
+  assert.ok(payload.steps.some((step) => step.step === "connector" && !step.ok));
+  assert.equal(fs.existsSync(path.join(root, ".prismo", "context-firewall.md")), true);
+  assert.equal(fs.existsSync(path.join(root, ".claude", "settings.json")), true);
+});
+
 test("instructions audit separates observable violations, partial compliance, and influence-unknown rules", () => {
   const root = tempRepo();
   const codexHome = tempRepo();
