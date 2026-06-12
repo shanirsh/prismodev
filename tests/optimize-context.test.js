@@ -43,6 +43,32 @@ test("optimize generates AI-readable context files in .prismo", () => {
   assert.ok(fs.readFileSync(path.join(root, ".prismo", "recommended-CLAUDE.boilerplate.md"), "utf8").includes("Do not overwrite an existing curated CLAUDE.md"));
 });
 
+test("optimize does not back up unchanged reports on repeated runs", () => {
+  const root = tempRepo();
+  fs.mkdirSync(path.join(root, "frontend", "src", "app"), { recursive: true });
+  fs.writeFileSync(path.join(root, "frontend", "package.json"), JSON.stringify({
+    dependencies: { next: "14.0.0", react: "18.0.0" },
+  }), "utf8");
+  fs.writeFileSync(path.join(root, "frontend", "src", "app", "page.tsx"), "export default function Page() { return null }\n", "utf8");
+
+  const first = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "optimize", root],
+    { encoding: "utf8" }
+  );
+  assert.equal(first.status, 0, first.stderr);
+
+  const second = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "optimize", root],
+    { encoding: "utf8" }
+  );
+  assert.equal(second.status, 0, second.stderr);
+
+  const backups = fs.readdirSync(path.join(root, ".prismo")).filter((name) => name.endsWith(".bak"));
+  assert.deepEqual(backups, []);
+});
+
 test("optimize scoped frontend command generates frontend-context.md", () => {
   const root = tempRepo();
   fs.mkdirSync(path.join(root, "frontend", "src", "components"), { recursive: true });
