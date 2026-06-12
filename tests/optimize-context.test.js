@@ -69,6 +69,39 @@ test("optimize does not back up unchanged reports on repeated runs", () => {
   assert.deepEqual(backups, []);
 });
 
+test("optimize ignores generated context when counting text references", () => {
+  const root = tempRepo();
+  fs.mkdirSync(path.join(root, "backend", "app", "modules", "chat", "application", "pipeline"), { recursive: true });
+  fs.mkdirSync(path.join(root, ".prismo"), { recursive: true });
+  fs.writeFileSync(path.join(root, "backend", "requirements.txt"), "fastapi\nsqlalchemy\n", "utf8");
+  fs.writeFileSync(path.join(root, "backend", "app", "main.py"), "from fastapi import FastAPI\nfrom app.modules.chat.application.pipeline import base\n", "utf8");
+  fs.writeFileSync(path.join(root, "backend", "app", "modules", "chat", "application", "pipeline", "base.py"), "class PipelineBase: pass\n", "utf8");
+  fs.writeFileSync(path.join(root, ".prismo", "backend-context.ts"), [
+    "backend/app/modules/chat/application/pipeline/base.py",
+    "base PipelineBase base PipelineBase",
+    "",
+  ].join("\n"), "utf8");
+
+  const first = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "optimize", root],
+    { encoding: "utf8" }
+  );
+  assert.equal(first.status, 0, first.stderr);
+  const backendSummary = fs.readFileSync(path.join(root, ".prismo", "backend-summary.md"), "utf8");
+  assert.match(backendSummary, /base\.py \([^)]*2 text reference signals/);
+
+  const second = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "optimize", root],
+    { encoding: "utf8" }
+  );
+  assert.equal(second.status, 0, second.stderr);
+
+  const backups = fs.readdirSync(path.join(root, ".prismo")).filter((name) => name.endsWith(".bak"));
+  assert.deepEqual(backups, []);
+});
+
 test("optimize scoped frontend command generates frontend-context.md", () => {
   const root = tempRepo();
   fs.mkdirSync(path.join(root, "frontend", "src", "components"), { recursive: true });
