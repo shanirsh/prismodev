@@ -198,6 +198,7 @@ static_collected/
 
 # Claude Code
 .claude/worktrees/
+.claude/
 
 # PrismoDev local output (dogfooding)
 .prismo/
