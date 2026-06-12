@@ -102,6 +102,35 @@ test("optimize ignores generated context when counting text references", () => {
   assert.deepEqual(backups, []);
 });
 
+test("optimize report metadata changes do not create backups", () => {
+  const root = tempRepo();
+  fs.mkdirSync(path.join(root, "frontend", "src", "components"), { recursive: true });
+  fs.writeFileSync(path.join(root, "frontend", "package.json"), JSON.stringify({
+    dependencies: { next: "14.0.0", react: "18.0.0" },
+  }), "utf8");
+  fs.writeFileSync(path.join(root, "frontend", "src", "components", "Button.tsx"), "export function Button() { return null }\n", "utf8");
+
+  const scoped = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "optimize", "frontend", root],
+    { encoding: "utf8" }
+  );
+  assert.equal(scoped.status, 0, scoped.stderr);
+  assert.ok(fs.readFileSync(path.join(root, ".prismo", "optimize-report.md"), "utf8").includes(".prismo/frontend-context.md"));
+
+  const unscoped = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "optimize", root],
+    { encoding: "utf8" }
+  );
+  assert.equal(unscoped.status, 0, unscoped.stderr);
+  const report = fs.readFileSync(path.join(root, ".prismo", "optimize-report.md"), "utf8");
+  assert.equal(report.includes(".prismo/frontend-context.md"), false);
+
+  const backups = fs.readdirSync(path.join(root, ".prismo")).filter((name) => name.endsWith(".bak"));
+  assert.deepEqual(backups, []);
+});
+
 test("optimize scoped frontend command generates frontend-context.md", () => {
   const root = tempRepo();
   fs.mkdirSync(path.join(root, "frontend", "src", "components"), { recursive: true });
