@@ -76,3 +76,41 @@ test("connect, status, sync dry-run, and disconnect support seamless cloud setup
   assert.equal(disconnected.disconnected, true);
   assert.equal(fs.existsSync(path.join(prismoHome, "config.json")), false);
 });
+
+test("sync captures Claude Code sessions when the repo path contains spaces", () => {
+  const base = tempDir();
+  const prismoHome = tempDir();
+  const claudeHome = tempDir();
+  // Repo path with a space, like the common "Code Projects" folder.
+  const root = path.join(base, "My Code", "app");
+  fs.mkdirSync(path.join(root, "src"), { recursive: true });
+  fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ dependencies: { react: "18.0.0" } }), "utf8");
+
+  // Claude Code encodes the project folder by replacing path separators,
+  // whitespace, and dots in the cwd with "-". Create both possible encodings.
+  const encode = (p) => p.replace(/[\/\\:.\s]/g, "-");
+  let realRoot = root;
+  try { realRoot = fs.realpathSync(root); } catch {}
+  for (const enc of new Set([encode(root), encode(realRoot)])) {
+    const projDir = path.join(claudeHome, "projects", enc);
+    fs.mkdirSync(projDir, { recursive: true });
+    fs.writeFileSync(path.join(projDir, "sess.jsonl"), [
+      JSON.stringify({ type: "summary", summary: "spaced path work" }),
+      JSON.stringify({ type: "user", message: { role: "user", content: "do work" }, timestamp: "2026-06-12T10:00:00Z" }),
+      JSON.stringify({ type: "assistant", message: { role: "assistant", usage: { input_tokens: 400000, output_tokens: 50000 }, content: [{ type: "text", text: "reading src/app.ts ".repeat(50) }] }, timestamp: "2026-06-12T10:01:00Z" }),
+    ].join("\n"), "utf8");
+  }
+
+  const env = {
+    PRISMO_HOME: prismoHome,
+    PRISMO_CLAUDE_HOME: claudeHome,
+    PRISMO_CODEX_HOME: path.join(base, "none"),
+    PRISMO_CURSOR_HOME: path.join(base, "none"),
+    PRISMO_CURSOR_APP_SUPPORT: path.join(base, "none"),
+  };
+  const res = runPrismo(["sync", "--dry-run", "--json"], { env, cwd: root });
+  assert.equal(res.status, 0, res.stderr);
+  const payload = JSON.parse(res.stdout).payload;
+  const tools = (payload.sessions || []).map((s) => s.tool);
+  assert.ok(tools.some((t) => String(t).includes("claude")), `expected a Claude Code session, got tools: ${JSON.stringify(tools)}`);
+});
