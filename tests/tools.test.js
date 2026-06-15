@@ -426,6 +426,36 @@ test("mcp server initializes and lists Prismo tools", () => {
   assert.ok(toolNames.includes("prismo_instructions_ablate"));
   assert.ok(toolNames.includes("prismo_replay"));
   assert.ok(toolNames.includes("prismo_boundaries"));
+  assert.ok(toolNames.includes("prismo_should_shield"));
+  assert.ok(toolNames.includes("prismo_loop_check"));
+  assert.ok(toolNames.includes("prismo_context_guard"));
+});
+
+test("mcp prismo_should_shield decides per command", () => {
+  const root = tempRepo();
+  function callShield(command) {
+    const input = [
+      JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: {} }),
+      JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "prismo_should_shield", arguments: { command, path: root } } }),
+      "",
+    ].join("\n");
+    const result = spawnSync(
+      process.execPath,
+      [path.join(__dirname, "..", "bin", "prismo.js"), "mcp", root],
+      { encoding: "utf8", input, env: { ...process.env, PRISMO_CURSOR_HOME: path.join(root, "none"), PRISMO_CURSOR_APP_SUPPORT: path.join(root, "none") } }
+    );
+    assert.equal(result.status, 0, result.stderr);
+    const lines = result.stdout.trim().split("\n").map((line) => JSON.parse(line));
+    return JSON.parse(lines[1].result.content[0].text);
+  }
+
+  const test1 = callShield("npm test");
+  assert.equal(test1.shouldShield, true);
+  assert.ok(test1.recommended.includes("shield -- npm test"));
+
+  const test2 = callShield("git status");
+  assert.equal(test2.shouldShield, false);
+  assert.equal(test2.recommended, null);
 });
 
 test("mcp doctor validates tools and prints config", () => {
@@ -440,7 +470,7 @@ test("mcp doctor validates tools and prints config", () => {
   const payload = JSON.parse(result.stdout);
   assert.equal(payload.ok, true);
   assert.equal(payload.server.name, "prismodev");
-  assert.equal(payload.tools.count, 17);
+  assert.equal(payload.tools.count, 20);
   assert.equal(payload.tools.hasShield, true);
   assert.equal(payload.smoke.scan.ok, true);
   assert.deepEqual(payload.config.mcpServers.prismodev.args.slice(0, 3), ["-y", "getprismo", "mcp"]);
