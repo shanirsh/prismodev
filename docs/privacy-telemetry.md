@@ -15,6 +15,8 @@ This page lists **exactly** what the connector sends after you connect, field by
 
 ## What session sync sends (`prismo sync`, and the connector on an interval)
 
+The background connector captures recent agent sessions from **every repo** on this machine (each attributed to its own repo), so all your agent activity is visible in one place — not just the repo the connector was started in. A one-off `prismo sync` covers only the current repo unless you pass `--all-repos`. Either way, only the numbers and labels below are sent; never code or prompts.
+
 Per machine:
 
 | field | example | note |

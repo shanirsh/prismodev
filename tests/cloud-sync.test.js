@@ -114,3 +114,45 @@ test("sync captures Claude Code sessions when the repo path contains spaces", ()
   const tools = (payload.sessions || []).map((s) => s.tool);
   assert.ok(tools.some((t) => String(t).includes("claude")), `expected a Claude Code session, got tools: ${JSON.stringify(tools)}`);
 });
+
+test("sync --all-repos captures sessions from multiple repos, each attributed to its own repo", () => {
+  const base = tempDir();
+  const prismoHome = tempDir();
+  const claudeHome = tempDir();
+  const repoA = path.join(base, "repo-a");
+  const repoB = path.join(base, "My Code", "repo-b"); // spaced path too
+  fs.mkdirSync(repoA, { recursive: true });
+  fs.mkdirSync(repoB, { recursive: true });
+
+  const encode = (p) => p.replace(/[\/\\:.\s]/g, "-");
+  function writeClaudeSession(repoRoot, sessionId) {
+    let real = repoRoot;
+    try { real = fs.realpathSync(repoRoot); } catch {}
+    for (const enc of new Set([encode(repoRoot), encode(real)])) {
+      const dir = path.join(claudeHome, "projects", enc);
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(dir, `${sessionId}.jsonl`), [
+        JSON.stringify({ type: "summary", summary: "work", cwd: real }),
+        JSON.stringify({ type: "user", cwd: real, message: { role: "user", content: "go" }, timestamp: "2026-06-12T10:00:00Z" }),
+        JSON.stringify({ type: "assistant", cwd: real, message: { role: "assistant", usage: { input_tokens: 300000, output_tokens: 40000 }, content: [{ type: "text", text: "reading src/a.ts ".repeat(40) }] }, timestamp: "2026-06-12T10:01:00Z" }),
+      ].join("\n"), "utf8");
+    }
+  }
+  writeClaudeSession(repoA, "sess-a");
+  writeClaudeSession(repoB, "sess-b");
+
+  const env = {
+    PRISMO_HOME: prismoHome,
+    PRISMO_CLAUDE_HOME: claudeHome,
+    PRISMO_CODEX_HOME: path.join(base, "none"),
+    PRISMO_CURSOR_HOME: path.join(base, "none"),
+    PRISMO_CURSOR_APP_SUPPORT: path.join(base, "none"),
+  };
+  // Run from repoA but request all repos: must capture repoB's session too.
+  const res = runPrismo(["sync", "--dry-run", "--json", "--all-repos"], { env, cwd: repoA });
+  assert.equal(res.status, 0, res.stderr);
+  const payload = JSON.parse(res.stdout).payload;
+  const repos = new Set((payload.sessions || []).map((s) => s.repo && s.repo.pathBasename).filter(Boolean));
+  assert.ok(repos.has("repo-a"), `expected repo-a, got ${[...repos]}`);
+  assert.ok(repos.has("repo-b"), `expected repo-b attributed to its own repo, got ${[...repos]}`);
+});
