@@ -255,6 +255,31 @@ test("firewall generates scoped context policy files", () => {
   assert.ok(fs.readFileSync(path.join(root, ".prismo", "firewall-prompt.md"), "utf8").includes("Follow .prismo/context-firewall.md"));
 });
 
+test("firewall updates generated policy files without backups", () => {
+  const root = tempRepo();
+  fs.mkdirSync(path.join(root, "backend", "app", "auth"), { recursive: true });
+  fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ dependencies: { express: "4.0.0" } }), "utf8");
+  fs.writeFileSync(path.join(root, "backend", "app", "auth", "security.py"), "def auth(): pass\n", "utf8");
+
+  const first = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "firewall", "enforcement", "--json", root],
+    { encoding: "utf8" }
+  );
+  assert.equal(first.status, 0, first.stderr);
+
+  const second = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "firewall", "repeated-file-reads", "--json", root],
+    { encoding: "utf8" }
+  );
+  assert.equal(second.status, 0, second.stderr);
+  assert.ok(fs.readFileSync(path.join(root, ".prismo", "firewall-prompt.md"), "utf8").includes("repeated-file-reads task"));
+
+  const backups = fs.readdirSync(path.join(root, ".prismo")).filter((name) => name.endsWith(".bak"));
+  assert.deepEqual(backups, []);
+});
+
 test("init dry-run previews npm scripts without modifying package.json", () => {
   const root = tempRepo();
   fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ scripts: {} }, null, 2), "utf8");
