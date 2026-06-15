@@ -202,3 +202,6 @@ static_collected/
 
 # PrismoDev local output (dogfooding)
 .prismo/
+
+# Prismo backup files (connector regenerates these)
+*.prismo-backup

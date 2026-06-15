@@ -145,3 +145,6 @@ static_collected/
 .claude/worktrees/
 .prismo/
 prismo-optimized-CLAUDE.template.md
+
+# Added by PrismoDev
+.claude/
