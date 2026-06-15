@@ -148,3 +148,6 @@ prismo-optimized-CLAUDE.template.md
 
 # Added by PrismoDev
 .claude/
+
+# Added by PrismoDev
+*.prismo-backup

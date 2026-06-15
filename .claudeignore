@@ -149,3 +149,6 @@ static_collected/
 
 # Added by PrismoDev
 .claude/
+
+# Added by PrismoDev
+*.prismo-backup
