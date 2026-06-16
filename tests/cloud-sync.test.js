@@ -156,3 +156,41 @@ test("sync --all-repos captures sessions from multiple repos, each attributed to
   assert.ok(repos.has("repo-a"), `expected repo-a, got ${[...repos]}`);
   assert.ok(repos.has("repo-b"), `expected repo-b attributed to its own repo, got ${[...repos]}`);
 });
+
+test("sessions and report render local usage from session logs", () => {
+  const base = tempDir();
+  const prismoHome = tempDir();
+  const codexHome = tempDir();
+  const root = path.join(base, "app");
+  fs.mkdirSync(path.join(root, "src"), { recursive: true });
+  fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ dependencies: { react: "18.0.0" } }), "utf8");
+  const sessionDir = path.join(codexHome, "sessions", "2026", "06", "12");
+  fs.mkdirSync(sessionDir, { recursive: true });
+  fs.writeFileSync(path.join(sessionDir, "s.jsonl"), [
+    JSON.stringify({ type: "event_msg", timestamp: "2026-06-12T10:00:00Z", payload: { type: "session_meta", id: "s", cwd: root, model: "gpt-test" } }),
+    JSON.stringify({ type: "event_msg", timestamp: "2026-06-12T10:01:00Z", payload: { type: "token_count", info: { total_token_usage: { input_tokens: 300000, output_tokens: 80000, total_tokens: 380000 } } } }),
+    JSON.stringify({ type: "event_msg", timestamp: "2026-06-12T10:02:00Z", payload: { type: "tool_result", content: "ERROR build failed\nnpm test\nnpm test\nnpm test\nnpm test\n".repeat(1500) } }),
+  ].join("\n"), "utf8");
+
+  const env = {
+    PRISMO_HOME: prismoHome,
+    PRISMO_CODEX_HOME: codexHome,
+    PRISMO_CLAUDE_HOME: path.join(base, "none"),
+    PRISMO_CURSOR_HOME: path.join(base, "none"),
+    PRISMO_CURSOR_APP_SUPPORT: path.join(base, "none"),
+  };
+
+  const sessions = runPrismo(["sessions", "--json"], { env, cwd: root });
+  assert.equal(sessions.status, 0, sessions.stderr);
+  const sv = JSON.parse(sessions.stdout);
+  assert.equal(sv.command, "sessions");
+  assert.ok(sv.totals.sessions >= 1);
+  assert.ok(sv.sessions.some((s) => s.tool === "codex"));
+
+  const report = runPrismo(["report", "--json"], { env, cwd: root });
+  assert.equal(report.status, 0, report.stderr);
+  const rv = JSON.parse(report.stdout);
+  assert.equal(rv.command, "report");
+  assert.ok(rv.observedTokens > 0);
+  assert.ok(typeof rv.nextAction === "string" && rv.nextAction.length > 0);
+});
