@@ -132,7 +132,22 @@ test("three recorded failures block the next attempt", () => {
   assert.equal(state.loopStops[0].tool, "claude-code");
   assert.equal(state.loopStops[0].reason, "repeated-failing-command");
   assert.equal(state.loopStops[0].failures, 3);
-  assert.equal(state.loopStops[0].estimatedTokensSaved, 2000);
+  // pytest is a noisy command, so a blocked retry saves the higher estimate.
+  assert.equal(state.loopStops[0].estimatedTokensSaved, 12000);
+});
+
+test("loop-stop token estimate scales with command noisiness", () => {
+  const root = tempDir();
+  const enforce = enforceWith();
+  const quiet = () => readEvent(root, "Bash", { command: "git log" });
+  for (let i = 0; i < 4; i += 1) enforce.decidePreToolUse(root, quiet());
+  const noisy = () => readEvent(root, "Bash", { command: "npm run build" }, "session-2");
+  for (let i = 0; i < 4; i += 1) enforce.decidePreToolUse(root, noisy());
+
+  const state = JSON.parse(fs.readFileSync(path.join(root, ".prismo", "enforce-state.json"), "utf8"));
+  const byCmd = Object.fromEntries(state.loopStops.map((s) => [s.command, s.estimatedTokensSaved]));
+  assert.equal(byCmd["git log"], 2000);
+  assert.equal(byCmd["npm run build"], 12000);
 });
 
 test("unknown response shapes record nothing and keep the attempt fallback", () => {
