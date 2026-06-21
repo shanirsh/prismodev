@@ -35,6 +35,10 @@
         "title": "Prismo: Sign in"
       },
       {
+        "command": "prismo.signInWithKey",
+        "title": "Prismo: Sign in with API key"
+      },
+      {
         "command": "prismo.openDashboard",
         "title": "Prismo: Open dashboard"
       },

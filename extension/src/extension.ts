@@ -1,5 +1,10 @@
 import * as vscode from "vscode";
 import * as os from "os";
+import * as crypto from "crypto";
+
+// Publisher.name — the authority used in the editor callback URI.
+const EXTENSION_ID = "prismo.prismo";
+let pendingState: string | undefined;
 
 // The CLI's fully-wired sync pipeline (reads local agent sessions, builds the
 // payload, posts to the backend). esbuild bundles the whole dependency tree.
@@ -33,6 +38,37 @@ function config() {
 
 async function getToken(context: vscode.ExtensionContext): Promise<string | undefined> {
   return context.secrets.get(TOKEN_KEY);
+}
+
+function connectUrl(): string {
+  try {
+    const origin = new URL(config().dashboardUrl).origin;
+    return `${origin}/connect/editor`;
+  } catch {
+    return "https://getprismo.dev/connect/editor";
+  }
+}
+
+async function finalizeToken(context: vscode.ExtensionContext, token: string) {
+  await context.secrets.store(TOKEN_KEY, token.trim());
+  await updateStatusBar(context);
+  startSyncTimer(context);
+  void runSync(context, { silent: true });
+  vscode.window.showInformationMessage("Prismo connected. Your agent sessions will sync automatically.");
+}
+
+// Open the browser to the Prismo sign-in page, which redirects the user's key
+// back to this editor via its custom URI scheme (caught by the URI handler).
+async function startBrowserSignIn() {
+  pendingState = crypto.randomUUID();
+  const callback = await vscode.env.asExternalUri(
+    vscode.Uri.parse(`${vscode.env.uriScheme}://${EXTENSION_ID}/auth?state=${pendingState}`),
+  );
+  const url =
+    `${connectUrl()}?redirect=${encodeURIComponent(callback.toString(true))}` +
+    `&editor=${encodeURIComponent(vscode.env.appName)}`;
+  await vscode.env.openExternal(vscode.Uri.parse(url));
+  vscode.window.showInformationMessage("Finish signing in to Prismo in your browser, then return here.");
 }
 
 async function updateStatusBar(context: vscode.ExtensionContext) {
@@ -102,22 +138,36 @@ export async function activate(context: vscode.ExtensionContext) {
   statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
   context.subscriptions.push(statusBar);
 
+  // Catch the browser redirect: <scheme>://prismo.prismo/auth?token=…&state=…
   context.subscriptions.push(
-    vscode.commands.registerCommand("prismo.signIn", async () => {
-      // Phase 2 replaces this with a browser sign-in + vscode:// redirect that
-      // returns a scoped device token. For now, accept a pasted API key.
+    vscode.window.registerUriHandler({
+      handleUri: async (uri) => {
+        if (uri.path !== "/auth") return;
+        const q = new URLSearchParams(uri.query);
+        const token = q.get("token");
+        const state = q.get("state");
+        if (!token) return;
+        if (pendingState && state !== pendingState) {
+          vscode.window.showErrorMessage("Prismo sign-in could not be verified. Please try again.");
+          return;
+        }
+        pendingState = undefined;
+        await finalizeToken(context, token);
+      },
+    }),
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand("prismo.signIn", () => startBrowserSignIn()),
+
+    vscode.commands.registerCommand("prismo.signInWithKey", async () => {
       const token = await vscode.window.showInputBox({
         prompt: "Paste your Prismo API key",
         password: true,
         ignoreFocusOut: true,
         placeHolder: "pris_…",
       });
-      if (!token) return;
-      await context.secrets.store(TOKEN_KEY, token.trim());
-      await updateStatusBar(context);
-      startSyncTimer(context);
-      void runSync(context, { silent: true });
-      vscode.window.showInformationMessage("Prismo connected. Your agent sessions will sync automatically.");
+      if (token) await finalizeToken(context, token);
     }),
 
     vscode.commands.registerCommand("prismo.signOut", async () => {
