@@ -47,6 +47,8 @@ let lastWastePercent: number | undefined;
 let lastProjectedPerDev: number | undefined;
 let lastPlan: string | undefined;
 let isSignedIn = false;
+let isSyncing = false;
+let lastSyncedAt: number | undefined;
 let viewProvider: PrismoViewProvider | undefined;
 
 class PrismoViewProvider implements vscode.WebviewViewProvider {
@@ -69,6 +71,8 @@ class PrismoViewProvider implements vscode.WebviewViewProvider {
       wastePercent: lastWastePercent,
       projectedPerDev: lastProjectedPerDev,
       plan: lastPlan,
+      syncing: isSyncing,
+      lastSyncedAt: lastSyncedAt,
     });
   }
 
@@ -76,42 +80,79 @@ class PrismoViewProvider implements vscode.WebviewViewProvider {
     return `<!doctype html><html><head><meta charset="utf-8" />
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline';" />
 <style>
-  body { font-family: var(--vscode-font-family); color: var(--vscode-foreground); padding: 12px 14px; }
-  h2 { font-size: 13px; margin: 0 0 2px; }
-  p { color: var(--vscode-descriptionForeground); font-size: 12px; margin: 0 0 14px; }
-  .big { font-size: 28px; font-weight: 600; margin: 6px 0 0; }
-  .sub { color: var(--vscode-descriptionForeground); font-size: 12px; margin: 2px 0 16px; }
-  button { display: block; width: 100%; box-sizing: border-box; margin: 6px 0; padding: 7px 10px;
-    border: none; border-radius: 4px; font-size: 12px; cursor: pointer;
+  :root { --accent: #8a5cf6; }
+  * { box-sizing: border-box; }
+  body { font-family: var(--vscode-font-family); color: var(--vscode-foreground); padding: 16px 14px; font-size: 12px; }
+  .brand { display:flex; align-items:center; gap:7px; margin-bottom:18px; }
+  .brand .dot { width:14px; height:14px; border-radius:4px; background:linear-gradient(135deg,#7cd0ff,#b69cff 55%,#ff9ec8); }
+  .brand span { font-weight:600; letter-spacing:.2px; }
+  .eyebrow { color: var(--vscode-descriptionForeground); text-transform:uppercase; letter-spacing:.08em; font-size:10px; font-weight:600; }
+  .metric { margin: 6px 0 2px; font-size: 40px; font-weight: 650; line-height:1; }
+  .metric.high { color:#f0616d; } .metric.mid { color:#e0a23a; } .metric.low { color:#3fb27f; }
+  .metriclabel { color: var(--vscode-descriptionForeground); font-size:12px; }
+  .projected { margin:14px 0 4px; padding:10px 12px; border:1px solid var(--vscode-panel-border); border-radius:8px; }
+  .projected .n { font-size:18px; font-weight:600; }
+  .projected .l { color: var(--vscode-descriptionForeground); font-size:11px; margin-top:2px; }
+  .actions { margin-top:16px; }
+  button { display:flex; align-items:center; justify-content:center; width:100%; margin:7px 0; padding:8px 10px;
+    border:none; border-radius:6px; font-size:12px; font-weight:500; cursor:pointer;
     background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
   button:hover { background: var(--vscode-button-hoverBackground); }
   button.secondary { background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); }
-  .hidden { display: none; }
+  button:disabled { opacity:.6; cursor:default; }
+  .upgrade { background: var(--accent) !important; color:#fff !important; }
+  .status { margin-top:12px; color: var(--vscode-descriptionForeground); font-size:11px; display:flex; align-items:center; gap:6px; }
+  .status .live { width:7px; height:7px; border-radius:50%; background:#3fb27f; }
+  .lead { color: var(--vscode-descriptionForeground); line-height:1.5; margin:0 0 16px; }
+  .hidden { display:none; }
 </style></head><body>
+  <div class="brand"><span class="dot"></span><span>Prismo</span></div>
+
   <div id="signedout">
-    <h2>Connect Prismo</h2>
-    <p>See where your AI coding agents waste tokens and money — right here in your editor.</p>
+    <div class="eyebrow">Agent efficiency</div>
+    <p class="lead" style="margin-top:8px">See where your AI coding agents waste tokens and money — right here in your editor. No terminal.</p>
     <button onclick="send('prismo.signIn')">Sign in to Prismo</button>
   </div>
+
   <div id="signedin" class="hidden">
-    <h2>Agent efficiency</h2>
-    <div class="big" id="waste">—</div>
-    <div class="sub" id="projected"></div>
-    <button onclick="send('prismo.openDashboard')">Open dashboard</button>
-    <button class="secondary" onclick="send('prismo.syncNow')">Sync now</button>
-    <button class="secondary hidden" id="upgrade" onclick="send('prismo.upgrade')">Upgrade for team metrics</button>
-    <button class="secondary" onclick="send('prismo.signOut')">Sign out</button>
+    <div class="eyebrow">Avoidable waste</div>
+    <div class="metric" id="waste">—</div>
+    <div class="metriclabel">of your agent tokens</div>
+
+    <div class="projected hidden" id="projbox">
+      <div class="n" id="projn"></div>
+      <div class="l">projected per developer, at this rate</div>
+    </div>
+
+    <div class="actions">
+      <button onclick="send('prismo.openDashboard')">Open dashboard</button>
+      <button class="secondary" id="syncbtn" onclick="send('prismo.syncNow')">Sync now</button>
+      <button class="upgrade hidden" id="upgrade" onclick="send('prismo.upgrade')">Upgrade for team metrics</button>
+      <button class="secondary" onclick="send('prismo.signOut')">Sign out</button>
+    </div>
+
+    <div class="status"><span class="live"></span><span id="status">Connected</span></div>
   </div>
+
 <script>
   const vscode = acquireVsCodeApi();
   function send(command){ vscode.postMessage({ command }); }
+  function ago(ts){ if(!ts) return ''; const s=Math.round((Date.now()-ts)/1000);
+    if(s<10) return 'just now'; if(s<60) return s+'s ago'; const m=Math.round(s/60); if(m<60) return m+'m ago'; return Math.round(m/60)+'h ago'; }
   window.addEventListener('message', (e) => {
     const s = e.data; if (s.type !== 'state') return;
     document.getElementById('signedout').classList.toggle('hidden', s.signedIn);
     document.getElementById('signedin').classList.toggle('hidden', !s.signedIn);
-    document.getElementById('waste').textContent = (s.wastePercent ?? null) === null ? 'Measuring…' : s.wastePercent + '% waste';
-    document.getElementById('projected').textContent = s.projectedPerDev > 0 ? ('~$' + Math.round(s.projectedPerDev).toLocaleString() + '/yr per developer in avoidable spend') : '';
+    const w = document.getElementById('waste');
+    if (s.wastePercent === undefined || s.wastePercent === null) { w.textContent = '—'; w.className='metric'; }
+    else { w.textContent = s.wastePercent + '%'; w.className = 'metric ' + (s.wastePercent>=40?'high':s.wastePercent>=20?'mid':'low'); }
+    const hasProj = s.projectedPerDev > 0;
+    document.getElementById('projbox').classList.toggle('hidden', !hasProj);
+    if (hasProj) document.getElementById('projn').textContent = '$' + Math.round(s.projectedPerDev).toLocaleString() + '/yr';
     document.getElementById('upgrade').classList.toggle('hidden', s.plan !== 'free');
+    const btn = document.getElementById('syncbtn');
+    btn.disabled = !!s.syncing; btn.textContent = s.syncing ? 'Syncing…' : 'Sync now';
+    document.getElementById('status').textContent = s.syncing ? 'Syncing…' : (s.lastSyncedAt ? 'Synced ' + ago(s.lastSyncedAt) : 'Connected');
   });
 </script>
 </body></html>`;
@@ -238,6 +279,8 @@ async function runSync(context: vscode.ExtensionContext, opts: { silent?: boolea
   const { apiBase } = config();
   const rootDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || os.homedir();
   log(`sync: starting (apiBase=${apiBase}, root=${rootDir})`);
+  isSyncing = true;
+  viewProvider?.push();
   try {
     const result = await prismoScan.runSync(rootDir, {
       config: { token, apiUrl: apiBase },
@@ -272,6 +315,10 @@ async function runSync(context: vscode.ExtensionContext, opts: { silent?: boolea
     if (!opts.silent) {
       vscode.window.showErrorMessage(`Prismo sync failed: ${err instanceof Error ? err.message : String(err)}`);
     }
+  } finally {
+    isSyncing = false;
+    lastSyncedAt = Date.now();
+    viewProvider?.push();
   }
 }
 
