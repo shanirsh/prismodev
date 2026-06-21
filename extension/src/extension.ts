@@ -22,6 +22,7 @@ const prismoScan: {
 } = require("../../lib/prismo-dev-scan");
 
 const TOKEN_KEY = "prismo.deviceToken";
+const EMAIL_KEY = "prismo.accountEmail";
 
 let output: vscode.OutputChannel;
 function log(message: string) {
@@ -32,13 +33,13 @@ function log(message: string) {
 // inconsistently — Cursor folds part of the query into the path (e.g.
 // "/auth?state=…") and appends its own windowId — so merge every query
 // fragment before reading params. Exported for testing.
-export function parseAuthCallback(uri: { path: string; query: string }): { token: string; state: string | null } | null {
+export function parseAuthCallback(uri: { path: string; query: string }): { token: string; state: string | null; email: string | null } | null {
   const [pathOnly, pathQuery = ""] = (uri.path || "").split("?");
   if (pathOnly !== "/auth") return null;
   const q = new URLSearchParams([pathQuery, uri.query || ""].filter(Boolean).join("&"));
   const token = q.get("token");
   if (!token) return null;
-  return { token, state: q.get("state") };
+  return { token, state: q.get("state"), email: q.get("email") };
 }
 
 let statusBar: vscode.StatusBarItem;
@@ -47,6 +48,7 @@ let lastWastePercent: number | undefined;
 let lastProjectedPerDev: number | undefined;
 let lastPlan: string | undefined;
 let isSignedIn = false;
+let connectedEmail: string | undefined;
 let isSyncing = false;
 let lastSyncedAt: number | undefined;
 let viewProvider: PrismoViewProvider | undefined;
@@ -68,6 +70,7 @@ class PrismoViewProvider implements vscode.WebviewViewProvider {
     this.view?.webview.postMessage({
       type: "state",
       signedIn: isSignedIn,
+      email: connectedEmail,
       wastePercent: lastWastePercent,
       projectedPerDev: lastProjectedPerDev,
       plan: lastPlan,
@@ -90,6 +93,8 @@ class PrismoViewProvider implements vscode.WebviewViewProvider {
   .metric { margin: 6px 0 2px; font-size: 40px; font-weight: 650; line-height:1; }
   .metric.high { color:#f0616d; } .metric.mid { color:#e0a23a; } .metric.low { color:#3fb27f; }
   .metriclabel { color: var(--vscode-descriptionForeground); font-size:12px; }
+  .account { margin:10px 0 14px; padding:8px 10px; border:1px solid var(--vscode-panel-border); border-radius:8px; color:var(--vscode-descriptionForeground); }
+  .account strong { display:block; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--vscode-foreground); font-weight:500; }
   .projected { margin:14px 0 4px; padding:10px 12px; border:1px solid var(--vscode-panel-border); border-radius:8px; }
   .projected .n { font-size:18px; font-weight:600; }
   .projected .l { color: var(--vscode-descriptionForeground); font-size:11px; margin-top:2px; }
@@ -115,6 +120,8 @@ class PrismoViewProvider implements vscode.WebviewViewProvider {
   </div>
 
   <div id="signedin" class="hidden">
+    <div class="account">Connected as<strong id="email">Prismo account</strong></div>
+
     <div class="eyebrow">Avoidable waste</div>
     <div class="metric" id="waste">—</div>
     <div class="metriclabel">of your agent tokens</div>
@@ -144,6 +151,7 @@ class PrismoViewProvider implements vscode.WebviewViewProvider {
     document.getElementById('signedout').classList.toggle('hidden', s.signedIn);
     document.getElementById('signedin').classList.toggle('hidden', !s.signedIn);
     const w = document.getElementById('waste');
+    document.getElementById('email').textContent = s.email || 'Prismo account';
     if (s.wastePercent === undefined || s.wastePercent === null) { w.textContent = '—'; w.className='metric'; }
     else { w.textContent = s.wastePercent + '%'; w.className = 'metric ' + (s.wastePercent>=40?'high':s.wastePercent>=20?'mid':'low'); }
     const hasProj = s.projectedPerDev > 0;
@@ -170,6 +178,10 @@ function config() {
 
 async function getToken(context: vscode.ExtensionContext): Promise<string | undefined> {
   return context.secrets.get(TOKEN_KEY);
+}
+
+async function getConnectedEmail(context: vscode.ExtensionContext): Promise<string | undefined> {
+  return context.secrets.get(EMAIL_KEY);
 }
 
 function originOf(fallbackPath: string): string {
@@ -222,8 +234,10 @@ async function maybeNudgeUpgrade(context: vscode.ExtensionContext, digest: Diges
   }
 }
 
-async function finalizeToken(context: vscode.ExtensionContext, token: string) {
+async function finalizeToken(context: vscode.ExtensionContext, token: string, email?: string | null) {
   await context.secrets.store(TOKEN_KEY, token.trim());
+  const cleanEmail = email?.trim();
+  if (cleanEmail) await context.secrets.store(EMAIL_KEY, cleanEmail);
   await updateStatusBar(context);
   startSyncTimer(context);
   void runSync(context, { silent: true });
@@ -249,10 +263,11 @@ async function startBrowserSignIn() {
 async function updateStatusBar(context: vscode.ExtensionContext) {
   const token = await getToken(context);
   isSignedIn = Boolean(token);
+  connectedEmail = token ? await getConnectedEmail(context) : undefined;
   viewProvider?.push();
   if (token) {
     statusBar.text = lastWastePercent !== undefined ? `$(pulse) Prismo · ${lastWastePercent}% waste` : "$(pulse) Prismo";
-    const lines = ["Prismo is watching your AI coding agents."];
+    const lines = [connectedEmail ? `Connected as ${connectedEmail}.` : "Prismo is watching your AI coding agents."];
     if (lastProjectedPerDev && lastProjectedPerDev > 0) {
       lines.push(`~$${Math.round(lastProjectedPerDev).toLocaleString()}/yr per developer in avoidable spend.`);
     }
@@ -363,7 +378,7 @@ export async function activate(context: vscode.ExtensionContext) {
         }
         pendingState = undefined;
         log("callback: token accepted, finalizing");
-        await finalizeToken(context, parsed.token);
+        await finalizeToken(context, parsed.token, parsed.email);
       },
     }),
   );
@@ -383,6 +398,8 @@ export async function activate(context: vscode.ExtensionContext) {
 
     vscode.commands.registerCommand("prismo.signOut", async () => {
       await context.secrets.delete(TOKEN_KEY);
+      await context.secrets.delete(EMAIL_KEY);
+      connectedEmail = undefined;
       stopSyncTimer();
       await updateStatusBar(context);
       vscode.window.showInformationMessage("Signed out of Prismo.");

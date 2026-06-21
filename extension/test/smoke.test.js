@@ -5,6 +5,7 @@
 const test = require("node:test");
 const assert = require("node:assert");
 const Module = require("module");
+const path = require("node:path");
 
 function makeMockVscode(record) {
   return {
@@ -28,7 +29,7 @@ function makeMockVscode(record) {
     },
     workspace: {
       getConfiguration: () => ({ get: (_key, def) => def }),
-      workspaceFolders: undefined,
+      workspaceFolders: [{ uri: { fsPath: path.join(__dirname, "fixtures", "workspace") } }],
     },
     window: {
       createOutputChannel: () => ({ appendLine() {}, show() {}, dispose() {} }),
@@ -94,19 +95,34 @@ test("extension activates and registers its commands without throwing", async ()
   assert.ok(record.statusBar, "status bar item should be created");
   assert.ok(record.shown, "status bar should be shown");
   assert.ok(record.uriHandler && typeof record.uriHandler.handleUri === "function", "URI handler should be registered");
+  ext.deactivate();
 });
 
 test("parseAuthCallback handles Cursor folding query into the path", () => {
   const record = { commands: {} };
   const ext = loadExtensionWithMock(record);
   // Cursor delivers: path "/auth?state=GOOD", query "windowId=1&token=tok_x".
-  const parsed = ext.parseAuthCallback({ path: "/auth?state=GOOD", query: "windowId=1&token=tok_x" });
-  assert.deepEqual(parsed, { token: "tok_x", state: "GOOD" });
+  const parsed = ext.parseAuthCallback({ path: "/auth?state=GOOD", query: "windowId=1&token=tok_x&email=dev%40getprismo.dev" });
+  assert.deepEqual(parsed, { token: "tok_x", state: "GOOD", email: "dev@getprismo.dev" });
 
   // Clean VS Code form still works, and a non-/auth path is ignored.
-  assert.deepEqual(ext.parseAuthCallback({ path: "/auth", query: "token=t2&state=s2" }), { token: "t2", state: "s2" });
+  assert.deepEqual(ext.parseAuthCallback({ path: "/auth", query: "token=t2&state=s2" }), { token: "t2", state: "s2", email: null });
   assert.equal(ext.parseAuthCallback({ path: "/other", query: "token=t" }), null);
   assert.equal(ext.parseAuthCallback({ path: "/auth", query: "state=s" }), null);
+});
+
+test("URI callback stores the connected account email", async () => {
+  const record = { commands: {} };
+  const ext = loadExtensionWithMock(record);
+  const ctx = fakeContext();
+  await ext.activate(ctx);
+
+  await record.uriHandler.handleUri({ path: "/auth", query: "token=tok_real&email=dev%40getprismo.dev" });
+
+  assert.equal(ctx._store.get("prismo.deviceToken"), "tok_real");
+  assert.equal(ctx._store.get("prismo.accountEmail"), "dev@getprismo.dev");
+  assert.match(record.statusBar.tooltip, /Connected as dev@getprismo\.dev/);
+  ext.deactivate();
 });
 
 test("URI callback rejects a token whose state nonce doesn't match", async () => {
@@ -120,4 +136,5 @@ test("URI callback rejects a token whose state nonce doesn't match", async () =>
   await record.commands["prismo.signIn"]();
   await record.uriHandler.handleUri({ path: "/auth", query: "token=tok_evil&state=not-the-real-nonce" });
   assert.equal(ctx._store.get("prismo.deviceToken"), undefined, "mismatched-state token must not be stored");
+  ext.deactivate();
 });
