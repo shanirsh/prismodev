@@ -1,0 +1,87 @@
+{
+  "name": "prismo",
+  "displayName": "Prismo — AI Agent Efficiency",
+  "description": "See where your AI coding agents waste tokens and money — right inside Cursor and VS Code.",
+  "version": "0.1.0",
+  "publisher": "prismo",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other",
+    "AI"
+  ],
+  "keywords": [
+    "ai",
+    "claude",
+    "cursor",
+    "codex",
+    "tokens",
+    "cost"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/shanirsh/prismodev"
+  },
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "prismo.signIn",
+        "title": "Prismo: Sign in"
+      },
+      {
+        "command": "prismo.openDashboard",
+        "title": "Prismo: Open dashboard"
+      },
+      {
+        "command": "prismo.syncNow",
+        "title": "Prismo: Sync now"
+      },
+      {
+        "command": "prismo.signOut",
+        "title": "Prismo: Sign out"
+      }
+    ],
+    "configuration": {
+      "title": "Prismo",
+      "properties": {
+        "prismo.apiBase": {
+          "type": "string",
+          "default": "https://api.getprismo.dev",
+          "description": "Prismo API base URL. Change only for self-hosted or staging."
+        },
+        "prismo.dashboardUrl": {
+          "type": "string",
+          "default": "https://getprismo.dev/dashboard/dev",
+          "description": "Prismo dashboard URL opened by the status bar and commands."
+        },
+        "prismo.syncIntervalSeconds": {
+          "type": "number",
+          "default": 300,
+          "minimum": 60,
+          "description": "How often the extension syncs agent telemetry while the editor is open."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.js",
+    "watch": "node esbuild.js --watch",
+    "package": "npm run build && vsce package --no-dependencies",
+    "publish:vsce": "vsce publish --no-dependencies",
+    "publish:ovsx": "ovsx publish --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^2.24.0",
+    "esbuild": "^0.20.0",
+    "ovsx": "^0.9.0",
+    "typescript": "^5.4.0"
+  }
+}
