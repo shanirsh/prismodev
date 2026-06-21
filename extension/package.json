@@ -43,6 +43,10 @@
         "title": "Prismo: Open dashboard"
       },
       {
+        "command": "prismo.upgrade",
+        "title": "Prismo: Upgrade"
+      },
+      {
         "command": "prismo.syncNow",
         "title": "Prismo: Sync now"
       },

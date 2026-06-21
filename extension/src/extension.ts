@@ -26,6 +26,8 @@ const TOKEN_KEY = "prismo.deviceToken";
 let statusBar: vscode.StatusBarItem;
 let syncTimer: ReturnType<typeof setInterval> | undefined;
 let lastWastePercent: number | undefined;
+let lastProjectedPerDev: number | undefined;
+let lastPlan: string | undefined;
 
 function config() {
   const c = vscode.workspace.getConfiguration("prismo");
@@ -40,12 +42,53 @@ async function getToken(context: vscode.ExtensionContext): Promise<string | unde
   return context.secrets.get(TOKEN_KEY);
 }
 
-function connectUrl(): string {
+function originOf(fallbackPath: string): string {
   try {
-    const origin = new URL(config().dashboardUrl).origin;
-    return `${origin}/connect/editor`;
+    return new URL(config().dashboardUrl).origin + fallbackPath;
   } catch {
-    return "https://getprismo.dev/connect/editor";
+    return `https://getprismo.dev${fallbackPath}`;
+  }
+}
+
+function connectUrl(): string {
+  return originOf("/connect/editor");
+}
+
+type Digest = {
+  plan?: string;
+  wastePercent?: number;
+  projectedAnnualPerDeveloper?: number;
+  verifiedDollarsSaved?: number;
+};
+
+async function fetchDigest(apiBase: string, token: string): Promise<Digest | null> {
+  try {
+    const res = await fetch(`${apiBase.replace(/\/$/, "")}/v1/dev/workspace/digest/agent`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as Digest;
+  } catch {
+    return null;
+  }
+}
+
+const NUDGE_SHOWN_KEY = "prismo.upgradeNudgeShown";
+
+// Show the upgrade prompt once, only when there's a real number to motivate it.
+async function maybeNudgeUpgrade(context: vscode.ExtensionContext, digest: Digest) {
+  if (digest.plan && digest.plan !== "free") return;
+  if (!digest.projectedAnnualPerDeveloper || digest.projectedAnnualPerDeveloper <= 0) return;
+  if (context.globalState.get<boolean>(NUDGE_SHOWN_KEY)) return;
+  await context.globalState.update(NUDGE_SHOWN_KEY, true);
+  const annual = `$${Math.round(digest.projectedAnnualPerDeveloper).toLocaleString()}/yr`;
+  const choice = await vscode.window.showInformationMessage(
+    `Prismo found ~${annual} per developer in avoidable agent spend. Upgrade to see your team's full picture and verified savings.`,
+    "Upgrade",
+    "Not now",
+  );
+  if (choice === "Upgrade") {
+    await vscode.env.openExternal(vscode.Uri.parse(originOf("/pricing")));
   }
 }
 
@@ -75,7 +118,13 @@ async function updateStatusBar(context: vscode.ExtensionContext) {
   const token = await getToken(context);
   if (token) {
     statusBar.text = lastWastePercent !== undefined ? `$(pulse) Prismo · ${lastWastePercent}% waste` : "$(pulse) Prismo";
-    statusBar.tooltip = "Prismo is watching your AI coding agents. Click to open the dashboard.";
+    const lines = ["Prismo is watching your AI coding agents."];
+    if (lastProjectedPerDev && lastProjectedPerDev > 0) {
+      lines.push(`~$${Math.round(lastProjectedPerDev).toLocaleString()}/yr per developer in avoidable spend.`);
+    }
+    if (lastPlan === "free") lines.push("Free plan — run “Prismo: Upgrade” for team metrics.");
+    lines.push("Click to open the dashboard.");
+    statusBar.tooltip = lines.join("\n");
     statusBar.command = "prismo.openDashboard";
   } else {
     statusBar.text = "$(plug) Prismo: Sign in";
@@ -107,8 +156,16 @@ async function runSync(context: vscode.ExtensionContext, opts: { silent?: boolea
     }
     if (typeof result.aggregate?.wastePercent === "number") {
       lastWastePercent = result.aggregate.wastePercent;
-      await updateStatusBar(context);
     }
+    // Pull the org-level digest for plan + the projected number we surface.
+    const digest = await fetchDigest(apiBase, token);
+    if (digest) {
+      if (typeof digest.wastePercent === "number") lastWastePercent = digest.wastePercent;
+      lastProjectedPerDev = digest.projectedAnnualPerDeveloper;
+      lastPlan = digest.plan;
+      await maybeNudgeUpgrade(context, digest);
+    }
+    await updateStatusBar(context);
     if (!opts.silent) {
       vscode.window.showInformationMessage(
         result.skipped ? "Prismo: already up to date." : "Prismo: synced your agent sessions.",
@@ -179,6 +236,10 @@ export async function activate(context: vscode.ExtensionContext) {
 
     vscode.commands.registerCommand("prismo.openDashboard", async () => {
       await vscode.env.openExternal(vscode.Uri.parse(config().dashboardUrl));
+    }),
+
+    vscode.commands.registerCommand("prismo.upgrade", async () => {
+      await vscode.env.openExternal(vscode.Uri.parse(originOf("/pricing")));
     }),
 
     vscode.commands.registerCommand("prismo.syncNow", () => runSync(context)),
