@@ -83,6 +83,7 @@
     }
   },
   "scripts": {
+    "test": "npm run build && node --test test/smoke.test.js",
     "build": "node esbuild.js",
     "watch": "node esbuild.js --watch",
     "package": "npm run build && vsce package --no-dependencies",
