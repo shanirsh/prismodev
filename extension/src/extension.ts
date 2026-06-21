@@ -1,9 +1,26 @@
 import * as vscode from "vscode";
+import * as os from "os";
+
+// The CLI's fully-wired sync pipeline (reads local agent sessions, builds the
+// payload, posts to the backend). esbuild bundles the whole dependency tree.
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const prismoScan: {
+  runSync: (
+    rootDir: string,
+    options: Record<string, unknown>,
+  ) => Promise<{
+    synced?: boolean;
+    skipped?: boolean;
+    error?: string;
+    aggregate?: { wastePercent?: number; estimatedWastedTokens?: number; displayTokens?: number };
+  }>;
+} = require("../../lib/prismo-dev-scan");
 
 const TOKEN_KEY = "prismo.deviceToken";
 
 let statusBar: vscode.StatusBarItem;
 let syncTimer: ReturnType<typeof setInterval> | undefined;
+let lastWastePercent: number | undefined;
 
 function config() {
   const c = vscode.workspace.getConfiguration("prismo");
@@ -21,7 +38,7 @@ async function getToken(context: vscode.ExtensionContext): Promise<string | unde
 async function updateStatusBar(context: vscode.ExtensionContext) {
   const token = await getToken(context);
   if (token) {
-    statusBar.text = "$(pulse) Prismo";
+    statusBar.text = lastWastePercent !== undefined ? `$(pulse) Prismo · ${lastWastePercent}% waste` : "$(pulse) Prismo";
     statusBar.tooltip = "Prismo is watching your AI coding agents. Click to open the dashboard.";
     statusBar.command = "prismo.openDashboard";
   } else {
@@ -32,16 +49,40 @@ async function updateStatusBar(context: vscode.ExtensionContext) {
   statusBar.show();
 }
 
-// Phase 3 fills this in by reusing lib/prismo-dev/cloud-sync (read local agent
-// files → build payload → POST /v1/dev/workspace/sessions/sync with the token).
+// Read the local agent sessions and push aggregate metrics to the backend,
+// reusing the CLI's sync pipeline with the editor's stored token.
 async function runSync(context: vscode.ExtensionContext, opts: { silent?: boolean } = {}) {
   const token = await getToken(context);
   if (!token) {
     if (!opts.silent) vscode.window.showInformationMessage("Sign in to Prismo first.");
     return;
   }
-  // TODO(phase3): const payload = buildSyncPayload(...); await post(apiBase + '/v1/dev/workspace/sessions/sync', token, payload)
-  if (!opts.silent) vscode.window.showInformationMessage("Prismo: sync wired in Phase 3.");
+  const { apiBase } = config();
+  const rootDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || os.homedir();
+  try {
+    const result = await prismoScan.runSync(rootDir, {
+      config: { token, apiUrl: apiBase },
+      allRepos: true,
+      source: "extension",
+    });
+    if (result.error === "not-connected") {
+      if (!opts.silent) vscode.window.showWarningMessage("Prismo: this token isn't valid. Sign in again.");
+      return;
+    }
+    if (typeof result.aggregate?.wastePercent === "number") {
+      lastWastePercent = result.aggregate.wastePercent;
+      await updateStatusBar(context);
+    }
+    if (!opts.silent) {
+      vscode.window.showInformationMessage(
+        result.skipped ? "Prismo: already up to date." : "Prismo: synced your agent sessions.",
+      );
+    }
+  } catch (err) {
+    if (!opts.silent) {
+      vscode.window.showErrorMessage(`Prismo sync failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
 }
 
 function startSyncTimer(context: vscode.ExtensionContext) {
