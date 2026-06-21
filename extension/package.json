@@ -58,6 +58,10 @@
       {
         "command": "prismo.signOut",
         "title": "Prismo: Sign out"
+      },
+      {
+        "command": "prismo.showLogs",
+        "title": "Prismo: Show logs"
       }
     ],
     "configuration": {

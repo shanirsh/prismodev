@@ -31,6 +31,7 @@ function makeMockVscode(record) {
       workspaceFolders: undefined,
     },
     window: {
+      createOutputChannel: () => ({ appendLine() {}, show() {}, dispose() {} }),
       createStatusBarItem: () => {
         record.statusBar = { text: "", tooltip: "", command: "", show: () => { record.shown = true; }, dispose() {} };
         return record.statusBar;

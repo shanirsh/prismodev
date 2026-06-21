@@ -23,6 +23,11 @@ const prismoScan: {
 
 const TOKEN_KEY = "prismo.deviceToken";
 
+let output: vscode.OutputChannel;
+function log(message: string) {
+  if (output) output.appendLine(`[${new Date().toISOString()}] ${message}`);
+}
+
 let statusBar: vscode.StatusBarItem;
 let syncTimer: ReturnType<typeof setInterval> | undefined;
 let lastWastePercent: number | undefined;
@@ -110,6 +115,8 @@ async function startBrowserSignIn() {
   const url =
     `${connectUrl()}?redirect=${encodeURIComponent(callback.toString(true))}` +
     `&editor=${encodeURIComponent(vscode.env.appName)}`;
+  log(`sign-in: callback=${callback.toString(true)}`);
+  log(`sign-in: opening ${url}`);
   await vscode.env.openExternal(vscode.Uri.parse(url));
   vscode.window.showInformationMessage("Finish signing in to Prismo in your browser, then return here.");
 }
@@ -144,12 +151,14 @@ async function runSync(context: vscode.ExtensionContext, opts: { silent?: boolea
   }
   const { apiBase } = config();
   const rootDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || os.homedir();
+  log(`sync: starting (apiBase=${apiBase}, root=${rootDir})`);
   try {
     const result = await prismoScan.runSync(rootDir, {
       config: { token, apiUrl: apiBase },
       allRepos: true,
       source: "extension",
     });
+    log(`sync: result synced=${result.synced} skipped=${!!result.skipped} error=${result.error || "none"} waste=${result.aggregate?.wastePercent}`);
     if (result.error === "not-connected") {
       if (!opts.silent) vscode.window.showWarningMessage("Prismo: this token isn't valid. Sign in again.");
       return;
@@ -172,6 +181,8 @@ async function runSync(context: vscode.ExtensionContext, opts: { silent?: boolea
       );
     }
   } catch (err) {
+    const msg = err instanceof Error ? (err.stack || err.message) : String(err);
+    log(`sync: ERROR ${msg}`);
     if (!opts.silent) {
       vscode.window.showErrorMessage(`Prismo sync failed: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -192,6 +203,10 @@ function stopSyncTimer() {
 }
 
 export async function activate(context: vscode.ExtensionContext) {
+  output = vscode.window.createOutputChannel("Prismo");
+  context.subscriptions.push(output);
+  log(`activated · scheme=${vscode.env.uriScheme} app=${vscode.env.appName}`);
+
   statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
   context.subscriptions.push(statusBar);
 
@@ -199,16 +214,22 @@ export async function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.window.registerUriHandler({
       handleUri: async (uri) => {
+        log(`callback received: path=${uri.path} hasQuery=${Boolean(uri.query)}`);
         if (uri.path !== "/auth") return;
         const q = new URLSearchParams(uri.query);
         const token = q.get("token");
         const state = q.get("state");
-        if (!token) return;
+        if (!token) {
+          log("callback: no token in query");
+          return;
+        }
         if (pendingState && state !== pendingState) {
+          log(`callback: state mismatch (got ${state})`);
           vscode.window.showErrorMessage("Prismo sign-in could not be verified. Please try again.");
           return;
         }
         pendingState = undefined;
+        log("callback: token accepted, finalizing");
         await finalizeToken(context, token);
       },
     }),
@@ -243,6 +264,8 @@ export async function activate(context: vscode.ExtensionContext) {
     }),
 
     vscode.commands.registerCommand("prismo.syncNow", () => runSync(context)),
+
+    vscode.commands.registerCommand("prismo.showLogs", () => output.show()),
   );
 
   await updateStatusBar(context);
