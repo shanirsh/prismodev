@@ -96,6 +96,19 @@ test("extension activates and registers its commands without throwing", async ()
   assert.ok(record.uriHandler && typeof record.uriHandler.handleUri === "function", "URI handler should be registered");
 });
 
+test("parseAuthCallback handles Cursor folding query into the path", () => {
+  const record = { commands: {} };
+  const ext = loadExtensionWithMock(record);
+  // Cursor delivers: path "/auth?state=GOOD", query "windowId=1&token=tok_x".
+  const parsed = ext.parseAuthCallback({ path: "/auth?state=GOOD", query: "windowId=1&token=tok_x" });
+  assert.deepEqual(parsed, { token: "tok_x", state: "GOOD" });
+
+  // Clean VS Code form still works, and a non-/auth path is ignored.
+  assert.deepEqual(ext.parseAuthCallback({ path: "/auth", query: "token=t2&state=s2" }), { token: "t2", state: "s2" });
+  assert.equal(ext.parseAuthCallback({ path: "/other", query: "token=t" }), null);
+  assert.equal(ext.parseAuthCallback({ path: "/auth", query: "state=s" }), null);
+});
+
 test("URI callback rejects a token whose state nonce doesn't match", async () => {
   const record = { commands: {} };
   const ext = loadExtensionWithMock(record);

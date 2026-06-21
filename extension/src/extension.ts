@@ -28,6 +28,19 @@ function log(message: string) {
   if (output) output.appendLine(`[${new Date().toISOString()}] ${message}`);
 }
 
+// Parse the editor's auth callback defensively. Editors split this URI
+// inconsistently — Cursor folds part of the query into the path (e.g.
+// "/auth?state=…") and appends its own windowId — so merge every query
+// fragment before reading params. Exported for testing.
+export function parseAuthCallback(uri: { path: string; query: string }): { token: string; state: string | null } | null {
+  const [pathOnly, pathQuery = ""] = (uri.path || "").split("?");
+  if (pathOnly !== "/auth") return null;
+  const q = new URLSearchParams([pathQuery, uri.query || ""].filter(Boolean).join("&"));
+  const token = q.get("token");
+  if (!token) return null;
+  return { token, state: q.get("state") };
+}
+
 let statusBar: vscode.StatusBarItem;
 let syncTimer: ReturnType<typeof setInterval> | undefined;
 let lastWastePercent: number | undefined;
@@ -291,22 +304,19 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.window.registerUriHandler({
       handleUri: async (uri) => {
         log(`callback received: path=${uri.path} hasQuery=${Boolean(uri.query)}`);
-        if (uri.path !== "/auth") return;
-        const q = new URLSearchParams(uri.query);
-        const token = q.get("token");
-        const state = q.get("state");
-        if (!token) {
-          log("callback: no token in query");
+        const parsed = parseAuthCallback({ path: uri.path, query: uri.query });
+        if (!parsed) {
+          log("callback: no token after parsing");
           return;
         }
-        if (pendingState && state !== pendingState) {
-          log(`callback: state mismatch (got ${state})`);
+        if (pendingState && parsed.state !== pendingState) {
+          log(`callback: state mismatch (got ${parsed.state})`);
           vscode.window.showErrorMessage("Prismo sign-in could not be verified. Please try again.");
           return;
         }
         pendingState = undefined;
         log("callback: token accepted, finalizing");
-        await finalizeToken(context, token);
+        await finalizeToken(context, parsed.token);
       },
     }),
   );
