@@ -37,6 +37,7 @@ function makeMockVscode(record) {
         return record.statusBar;
       },
       registerUriHandler: (handler) => { record.uriHandler = handler; return { dispose() {} }; },
+      registerWebviewViewProvider: (id, provider) => { record.viewProvider = { id, provider }; return { dispose() {} }; },
       showInformationMessage: async () => undefined,
       showWarningMessage: async () => undefined,
       showErrorMessage: async () => undefined,

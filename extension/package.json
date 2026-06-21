@@ -34,6 +34,24 @@
     "onStartupFinished"
   ],
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "prismo",
+          "title": "Prismo",
+          "icon": "media/sidebar-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "prismo": [
+        {
+          "id": "prismo.home",
+          "name": "Prismo",
+          "type": "webview"
+        }
+      ]
+    },
     "commands": [
       {
         "command": "prismo.signIn",

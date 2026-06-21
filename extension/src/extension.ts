@@ -33,6 +33,77 @@ let syncTimer: ReturnType<typeof setInterval> | undefined;
 let lastWastePercent: number | undefined;
 let lastProjectedPerDev: number | undefined;
 let lastPlan: string | undefined;
+let isSignedIn = false;
+let viewProvider: PrismoViewProvider | undefined;
+
+class PrismoViewProvider implements vscode.WebviewViewProvider {
+  private view?: vscode.WebviewView;
+
+  resolveWebviewView(view: vscode.WebviewView) {
+    this.view = view;
+    view.webview.options = { enableScripts: true };
+    view.webview.html = this.html();
+    view.webview.onDidReceiveMessage((msg: { command?: string }) => {
+      if (msg.command) void vscode.commands.executeCommand(msg.command);
+    });
+    this.push();
+  }
+
+  push() {
+    this.view?.webview.postMessage({
+      type: "state",
+      signedIn: isSignedIn,
+      wastePercent: lastWastePercent,
+      projectedPerDev: lastProjectedPerDev,
+      plan: lastPlan,
+    });
+  }
+
+  private html(): string {
+    return `<!doctype html><html><head><meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline';" />
+<style>
+  body { font-family: var(--vscode-font-family); color: var(--vscode-foreground); padding: 12px 14px; }
+  h2 { font-size: 13px; margin: 0 0 2px; }
+  p { color: var(--vscode-descriptionForeground); font-size: 12px; margin: 0 0 14px; }
+  .big { font-size: 28px; font-weight: 600; margin: 6px 0 0; }
+  .sub { color: var(--vscode-descriptionForeground); font-size: 12px; margin: 2px 0 16px; }
+  button { display: block; width: 100%; box-sizing: border-box; margin: 6px 0; padding: 7px 10px;
+    border: none; border-radius: 4px; font-size: 12px; cursor: pointer;
+    background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
+  button:hover { background: var(--vscode-button-hoverBackground); }
+  button.secondary { background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); }
+  .hidden { display: none; }
+</style></head><body>
+  <div id="signedout">
+    <h2>Connect Prismo</h2>
+    <p>See where your AI coding agents waste tokens and money — right here in your editor.</p>
+    <button onclick="send('prismo.signIn')">Sign in to Prismo</button>
+  </div>
+  <div id="signedin" class="hidden">
+    <h2>Agent efficiency</h2>
+    <div class="big" id="waste">—</div>
+    <div class="sub" id="projected"></div>
+    <button onclick="send('prismo.openDashboard')">Open dashboard</button>
+    <button class="secondary" onclick="send('prismo.syncNow')">Sync now</button>
+    <button class="secondary hidden" id="upgrade" onclick="send('prismo.upgrade')">Upgrade for team metrics</button>
+    <button class="secondary" onclick="send('prismo.signOut')">Sign out</button>
+  </div>
+<script>
+  const vscode = acquireVsCodeApi();
+  function send(command){ vscode.postMessage({ command }); }
+  window.addEventListener('message', (e) => {
+    const s = e.data; if (s.type !== 'state') return;
+    document.getElementById('signedout').classList.toggle('hidden', s.signedIn);
+    document.getElementById('signedin').classList.toggle('hidden', !s.signedIn);
+    document.getElementById('waste').textContent = (s.wastePercent ?? null) === null ? 'Measuring…' : s.wastePercent + '% waste';
+    document.getElementById('projected').textContent = s.projectedPerDev > 0 ? ('~$' + Math.round(s.projectedPerDev).toLocaleString() + '/yr per developer in avoidable spend') : '';
+    document.getElementById('upgrade').classList.toggle('hidden', s.plan !== 'free');
+  });
+</script>
+</body></html>`;
+  }
+}
 
 function config() {
   const c = vscode.workspace.getConfiguration("prismo");
@@ -123,6 +194,8 @@ async function startBrowserSignIn() {
 
 async function updateStatusBar(context: vscode.ExtensionContext) {
   const token = await getToken(context);
+  isSignedIn = Boolean(token);
+  viewProvider?.push();
   if (token) {
     statusBar.text = lastWastePercent !== undefined ? `$(pulse) Prismo · ${lastWastePercent}% waste` : "$(pulse) Prismo";
     const lines = ["Prismo is watching your AI coding agents."];
@@ -209,6 +282,9 @@ export async function activate(context: vscode.ExtensionContext) {
 
   statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
   context.subscriptions.push(statusBar);
+
+  viewProvider = new PrismoViewProvider();
+  context.subscriptions.push(vscode.window.registerWebviewViewProvider("prismo.home", viewProvider));
 
   // Catch the browser redirect: <scheme>://prismo.prismo/auth?token=…&state=…
   context.subscriptions.push(
