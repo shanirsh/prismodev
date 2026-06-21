@@ -205,3 +205,7 @@ static_collected/
 
 # Prismo backup files (connector regenerates these)
 *.prismo-backup
+
+# Extension marketplace assets (the broad media/ rule above is too greedy)
+!extension/media/
+!extension/media/**

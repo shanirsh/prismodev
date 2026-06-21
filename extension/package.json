@@ -20,9 +20,14 @@
     "tokens",
     "cost"
   ],
+  "icon": "media/icon.png",
   "repository": {
     "type": "git",
     "url": "https://github.com/shanirsh/prismodev"
+  },
+  "homepage": "https://getprismo.dev",
+  "bugs": {
+    "url": "https://github.com/shanirsh/prismodev/issues"
   },
   "main": "./dist/extension.js",
   "activationEvents": [

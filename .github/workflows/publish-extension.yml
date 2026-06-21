@@ -1,0 +1,53 @@
+name: Publish extension
+
+# Publishes the VS Code / Cursor extension to the Microsoft Marketplace and
+# Open VSX. Triggered by tags like `ext-v0.1.0` so it never collides with the
+# CLI's `v*` npm release. Tokens come from repo secrets — never hardcoded.
+#
+# Required repository secrets:
+#   VSCE_PAT  – Azure DevOps Personal Access Token for the Marketplace publisher
+#   OVSX_PAT  – Open VSX access token (for Cursor / Windsurf)
+
+on:
+  push:
+    tags:
+      - "ext-v*"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      VSCE_PAT: ${{ secrets.VSCE_PAT }}
+      OVSX_PAT: ${{ secrets.OVSX_PAT }}
+    defaults:
+      run:
+        working-directory: extension
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Package
+        run: npx vsce package --no-dependencies -o prismo.vsix
+
+      - name: Publish to VS Code Marketplace
+        if: ${{ env.VSCE_PAT != '' }}
+        run: npx vsce publish --no-dependencies --packagePath prismo.vsix --pat "$VSCE_PAT"
+
+      - name: Publish to Open VSX (Cursor / Windsurf)
+        if: ${{ env.OVSX_PAT != '' }}
+        run: npx ovsx publish prismo.vsix --pat "$OVSX_PAT"
+
+      - name: Upload .vsix artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: prismo-vsix
+          path: extension/prismo.vsix

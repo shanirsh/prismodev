@@ -1,6 +1,7 @@
 .vscode/**
 .prismo/**
 src/**
+media/generate-icon.js
 node_modules/**
 esbuild.js
 tsconfig.json
