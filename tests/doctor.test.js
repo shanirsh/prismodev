@@ -83,6 +83,37 @@ test("doctor command safely optimizes repo and reports before/after payoff", () 
   assert.equal(fs.readFileSync(path.join(root, "CLAUDE.md"), "utf8").includes("Use concise instructions."), true);
 });
 
+test("pack receipt separates grounding roots from omitted roots and records tree state", () => {
+  const root = tempRepo();
+  fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ dependencies: { next: "14.0.0" } }), "utf8");
+  fs.mkdirSync(path.join(root, "src", "app"), { recursive: true });
+  fs.writeFileSync(path.join(root, "src", "app", "page.tsx"), "export default function Page() { return null }\n", "utf8");
+  // Present-but-omitted roots: a later reader must not think these grounded the pack.
+  fs.mkdirSync(path.join(root, "dist"), { recursive: true });
+  fs.writeFileSync(path.join(root, "dist", "bundle.js"), "console.log(1)\n".repeat(80), "utf8");
+  fs.mkdirSync(path.join(root, "logs"), { recursive: true });
+  fs.writeFileSync(path.join(root, "logs", "app.log"), "log line\n".repeat(300), "utf8");
+
+  const result = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "..", "bin", "prismo.js"), "optimize", "--json", root],
+    { encoding: "utf8", env: { ...process.env, PRISMO_CODEX_HOME: path.join(root, "none"), PRISMO_CLAUDE_HOME: path.join(root, "none"), PRISMO_CURSOR_HOME: path.join(root, "none"), PRISMO_CURSOR_APP_SUPPORT: path.join(root, "none") } }
+  );
+  assert.equal(result.status, 0, result.stderr);
+
+  const receipt = JSON.parse(fs.readFileSync(path.join(root, ".prismo", "architecture-summary.receipt.json"), "utf8"));
+  // The two split fields replace the ambiguous single source_roots.
+  assert.ok(Array.isArray(receipt.included_source_roots));
+  assert.ok(Array.isArray(receipt.excluded_roots));
+  assert.equal(receipt.source_roots, undefined);
+  // dist/logs were present but must be reported as excluded, never as grounding.
+  assert.ok(!receipt.included_source_roots.some((r) => r === "dist" || r === "logs"));
+  assert.ok(receipt.excluded_roots.includes("dist"));
+  assert.ok(receipt.excluded_roots.includes("logs"));
+  // repo_ref always carries a working-tree state (null outside a git repo).
+  assert.ok("working_tree_dirty" in receipt.repo_ref);
+});
+
 test("doctor --json outputs valid before/after payload only", () => {
   const root = tempRepo();
   fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ dependencies: { express: "4.0.0" } }), "utf8");
