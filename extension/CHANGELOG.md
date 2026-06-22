@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.1
+
+- Publish under the `getprismo` Open VSX namespace.
+- Show the Prismo logo and clearer workspace protection value in the editor panel.
+
 ## 0.1.0
 
 - First release.

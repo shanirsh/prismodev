@@ -8,13 +8,13 @@ once.
 ## One-time setup
 
 1. **Microsoft Marketplace publisher**
-   - Create an Azure DevOps org, then a Marketplace publisher with id `prismo`
+   - Create an Azure DevOps org, then a Marketplace publisher with id `getprismo`
      (must match `publisher` in `package.json`): https://marketplace.visualstudio.com/manage
    - Create a Personal Access Token (scope: *Marketplace → Manage*).
    - Add it as the repo secret **`VSCE_PAT`**.
 
 2. **Open VSX (for Cursor / Windsurf)**
-   - Sign in at https://open-vsx.org and create the `prismo` namespace.
+   - Sign in at https://open-vsx.org and create the `getprismo` namespace.
    - Create an access token under your profile.
    - Add it as the repo secret **`OVSX_PAT`**.
 
@@ -24,7 +24,7 @@ Secrets live only in GitHub Actions — they are never committed.
 
 ```bash
 # bump extension/package.json "version", commit, then:
-git tag ext-v0.1.0
+git tag ext-v0.1.1
 git push --tags
 ```
 

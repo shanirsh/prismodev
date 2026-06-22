@@ -1,7 +1,7 @@
 name: Publish extension
 
 # Publishes the VS Code / Cursor extension to the Microsoft Marketplace and
-# Open VSX. Triggered by tags like `ext-v0.1.0` so it never collides with the
+# Open VSX. Triggered by tags like `ext-v0.1.1` so it never collides with the
 # CLI's `v*` npm release. Tokens come from repo secrets — never hardcoded.
 #
 # Required repository secrets:

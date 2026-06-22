@@ -4,7 +4,7 @@ import * as crypto from "crypto";
 import * as path from "path";
 
 // Publisher.name — the authority used in the editor callback URI.
-const EXTENSION_ID = "prismo.prismo";
+const EXTENSION_ID = "getprismo.prismo";
 let pendingState: string | undefined;
 
 // The CLI's fully-wired sync pipeline (reads local agent sessions, builds the
@@ -429,7 +429,7 @@ export async function activate(context: vscode.ExtensionContext) {
   viewProvider = new PrismoViewProvider(context);
   context.subscriptions.push(vscode.window.registerWebviewViewProvider("prismo.home", viewProvider));
 
-  // Catch the browser redirect: <scheme>://prismo.prismo/auth?token=…&state=…
+  // Catch the browser redirect: <scheme>://getprismo.prismo/auth?token=…&state=…
   context.subscriptions.push(
     vscode.window.registerUriHandler({
       handleUri: async (uri) => {
