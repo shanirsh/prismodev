@@ -123,6 +123,8 @@ test("webview uses the packaged Prismo logo and repo-aware panel", async () => {
   record.viewProvider.provider.resolveWebviewView({ webview: mockWebview });
 
   assert.match(mockWebview.html, /<img src="[^"]*media\/icon\.png" alt="Prismo"/);
+  assert.match(mockWebview.html, /Protect this workspace/);
+  assert.match(mockWebview.html, /Detect repeated agent loops/);
   assert.match(mockWebview.html, /Copy shield command/);
   assert.deepEqual(mockWebview.options.localResourceRoots[0].fsPath, "/tmp/prismo-extension/media");
   ext.deactivate();

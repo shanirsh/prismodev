@@ -127,13 +127,22 @@ class PrismoViewProvider implements vscode.WebviewViewProvider {
   .status { margin-top:12px; color: var(--vscode-descriptionForeground); font-size:11px; display:flex; align-items:center; gap:6px; }
   .status .live { width:7px; height:7px; border-radius:50%; background:#3fb27f; }
   .lead { color: var(--vscode-descriptionForeground); line-height:1.5; margin:0 0 16px; }
+  .value { display:grid; gap:8px; margin:14px 0 16px; }
+  .value .row { display:grid; grid-template-columns:18px 1fr; gap:8px; align-items:start; color:var(--vscode-descriptionForeground); line-height:1.35; }
+  .value .mark { width:18px; height:18px; display:flex; align-items:center; justify-content:center; border-radius:5px; color:#3fb27f; background:color-mix(in srgb, #3fb27f 14%, transparent); font-size:11px; font-weight:800; }
+  .value strong { display:block; color:var(--vscode-foreground); font-weight:650; margin-bottom:1px; }
   .hidden { display:none; }
 </style></head><body>
   <div class="brand"><img src="${logoUri}" alt="Prismo" class="logo" /><span>Prismo</span></div>
 
   <div id="signedout">
     <div class="eyebrow">Agent efficiency</div>
-    <p class="lead" style="margin-top:8px">See where your AI coding agents waste tokens and money — right here in your editor. No terminal.</p>
+    <p class="lead" style="margin-top:8px">Protect this workspace while AI coding agents run.</p>
+    <div class="value">
+      <div class="row"><span class="mark">✓</span><span><strong>Detect repeated agent loops</strong>Catch agents rereading the same files or spinning on stale context.</span></div>
+      <div class="row"><span class="mark">✓</span><span><strong>Capture noisy command output safely</strong>Keep long test and build logs out of the agent context.</span></div>
+      <div class="row"><span class="mark">✓</span><span><strong>Verify saved tokens after sync</strong>Measure what changed after Prismo interventions run.</span></div>
+    </div>
     <button onclick="send('prismo.signIn')">Sign in to Prismo</button>
   </div>
 
