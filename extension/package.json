@@ -1,8 +1,8 @@
 {
   "name": "prismo",
-  "displayName": "Prismo — AI Agent Efficiency",
-  "description": "See where your AI coding agents waste tokens and money — right inside Cursor and VS Code.",
-  "version": "0.1.2",
+  "displayName": "Prismo — AI Agent Token Observability",
+  "description": "See where Claude Code, Cursor, and Codex waste tokens, by cause and repo, and verify whether fixes actually work. Runs locally; no code leaves your machine.",
+  "version": "0.1.3",
   "publisher": "getprismo",
   "license": "MIT",
   "engines": {

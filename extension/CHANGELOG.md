@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.3
+
+- Reposition as token observability + verification: show where agents waste tokens by cause and repo, and verify whether a fix actually worked.
+
 ## 0.1.2
 
 - Refine the Cursor and VS Code activity-bar icon for better small-size clarity.

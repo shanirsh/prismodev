@@ -1,7 +1,10 @@
 # Prismo for VS Code & Cursor
 
-See where your AI coding agents (Claude Code, Cursor, Codex) waste tokens and
-money — right inside your editor. No terminal, no separate Node install.
+Token observability for your AI coding agents, right inside your editor. Prismo
+shows where Claude Code, Cursor, and Codex waste tokens (by cause and repo) and
+verifies whether a fix actually reduced usage, instead of trusting a benchmark.
+No terminal, no separate Node install. Runs locally; your code never leaves your
+machine.
 
 ## How to use it
 

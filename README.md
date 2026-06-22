@@ -4,9 +4,9 @@
 [![npm downloads](https://img.shields.io/npm/dw/getprismo.svg)](https://www.npmjs.com/package/getprismo)
 [![license: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-Agent control plane for AI coding.
+Token observability and verification for AI coding agents.
 
-Prismo watches local Codex, Claude Code, and Cursor sessions, finds wasted agent context, applies safe interventions, and verifies whether those interventions actually saved tokens and dollars in later sessions.
+Prismo reads your local Codex, Claude Code, and Cursor sessions to show where tokens are wasted, by cause, repo, and session, then verifies whether any fix actually reduced usage in later sessions instead of trusting a benchmark. Compression, routing, and context tools are fixes; Prismo is the measurement and verification layer above them. Runs locally, so no code, prompts, or output leave your machine.
 
 ```bash
 npx getprismo protect
