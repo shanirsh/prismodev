@@ -2,7 +2,7 @@
   "name": "prismo",
   "displayName": "Prismo — AI Agent Efficiency",
   "description": "See where your AI coding agents waste tokens and money — right inside Cursor and VS Code.",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "publisher": "getprismo",
   "license": "MIT",
   "engines": {

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.2
+
+- Refine the Cursor and VS Code activity-bar icon for better small-size clarity.
+
 ## 0.1.1
 
 - Publish under the `getprismo` Open VSX namespace.
