@@ -1055,6 +1055,15 @@ npx getprismo context backend
 
 use these as the starting point for coding sessions instead of letting agents explore the whole repo.
 
+Each generated context pack also gets a machine-readable receipt next to it, for example:
+
+```text
+.prismo/frontend-context.md
+.prismo/frontend-context.receipt.json
+```
+
+Receipts record the repo ref, intended agent surfaces, source roots, omitted context classes, a digest of the source-file slice, estimated pack tokens, stale-after policy, and the command to regenerate/verify the pack. They do not include raw prompts or source contents; the digest is an audit handle so later sessions and the dashboard can tell what a pack represents without treating it as opaque markdown.
+
 ---
 
 ## tracking modes
@@ -1081,8 +1090,13 @@ no api keys. no intercepted prompts. no data uploaded.
 ├── architecture-summary.md
 ├── backend-summary.md
 ├── frontend-summary.md
+├── architecture-summary.receipt.json
+├── backend-summary.receipt.json
+├── frontend-summary.receipt.json
 ├── frontend-context.md
+├── frontend-context.receipt.json
 ├── backend-context.md
+├── backend-context.receipt.json
 ├── recommended-CLAUDE.boilerplate.md
 ├── recommended-AGENTS.boilerplate.md
 ├── recommended-.claudeignore

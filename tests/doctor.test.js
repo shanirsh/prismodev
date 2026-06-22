@@ -66,7 +66,20 @@ test("doctor command safely optimizes repo and reports before/after payoff", () 
   assert.ok(fs.existsSync(path.join(root, ".prismo", "prismo-dev-report.md")));
   assert.ok(fs.existsSync(path.join(root, "prismo-optimized-CLAUDE.template.md")));
   assert.ok(fs.existsSync(path.join(root, ".prismo", "architecture-summary.md")));
+  assert.ok(fs.existsSync(path.join(root, ".prismo", "architecture-summary.receipt.json")));
   assert.ok(fs.existsSync(path.join(root, ".prismo", "frontend-context.md")));
+  assert.ok(fs.existsSync(path.join(root, ".prismo", "frontend-context.receipt.json")));
+  const receipt = JSON.parse(fs.readFileSync(path.join(root, ".prismo", "frontend-context.receipt.json"), "utf8"));
+  assert.equal(receipt.schema_version, 1);
+  assert.equal(receipt.pack_id, "frontend-context");
+  assert.equal(receipt.pack_path, ".prismo/frontend-context.md");
+  assert.ok(receipt.source_globs_digest.startsWith("sha256:"));
+  assert.ok(receipt.target_agents.includes("codex"));
+  assert.ok(receipt.target_agents.includes("mcp"));
+  assert.ok(receipt.omitted_classes.includes("lockfiles"));
+  assert.equal(receipt.token_budget, 12000);
+  assert.equal(receipt.stale_if_older_than_ms, 86400000);
+  assert.match(receipt.verify_command, /getprismo optimize frontend/);
   assert.equal(fs.readFileSync(path.join(root, "CLAUDE.md"), "utf8").includes("Use concise instructions."), true);
 });
 
@@ -89,6 +102,7 @@ test("doctor --json outputs valid before/after payload only", () => {
   assert.equal(typeof payload.scoreDelta, "number");
   assert.ok(Array.isArray(payload.fixActions));
   assert.ok(payload.generatedFiles.includes(".prismo/architecture-summary.md"));
+  assert.ok(payload.generatedFiles.includes(".prismo/architecture-summary.receipt.json"));
   assert.ok(payload.contextCommand.includes("npx getprismo context"));
   assert.equal(result.stdout.trim().startsWith("{"), true);
 });
