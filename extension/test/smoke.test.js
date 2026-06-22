@@ -20,10 +20,15 @@ function makeMockVscode(record) {
           try { return new URL(s).search.replace(/^\?/, ""); } catch { return ""; }
         },
       }),
+      joinPath: (base, ...parts) => ({
+        fsPath: path.join(base.fsPath || "", ...parts),
+        toString: () => [base.toString ? base.toString() : base.fsPath || "", ...parts].join("/").replace(/\/+/g, "/"),
+      }),
     },
     env: {
       uriScheme: "cursor",
       appName: "Cursor",
+      clipboard: { writeText: async (text) => { record.clipboard = text; } },
       openExternal: async () => true,
       asExternalUri: async (uri) => uri,
     },
@@ -76,6 +81,7 @@ function fakeContext() {
       delete: async (k) => void store.delete(k),
     },
     globalState: { get: (k) => global.get(k), update: async (k, v) => void global.set(k, v) },
+    extensionUri: { fsPath: "/tmp/prismo-extension", toString: () => "file:///tmp/prismo-extension" },
     _store: store,
   };
 }
@@ -89,12 +95,36 @@ test("extension activates and registers its commands without throwing", async ()
   const ctx = fakeContext();
   await ext.activate(ctx);
 
-  for (const id of ["prismo.signIn", "prismo.signInWithKey", "prismo.signOut", "prismo.openDashboard", "prismo.syncNow", "prismo.upgrade"]) {
+  for (const id of ["prismo.signIn", "prismo.signInWithKey", "prismo.signOut", "prismo.openDashboard", "prismo.syncNow", "prismo.copyShieldCommand", "prismo.upgrade"]) {
     assert.equal(typeof record.commands[id], "function", `command ${id} should be registered`);
   }
   assert.ok(record.statusBar, "status bar item should be created");
   assert.ok(record.shown, "status bar should be shown");
   assert.ok(record.uriHandler && typeof record.uriHandler.handleUri === "function", "URI handler should be registered");
+  ext.deactivate();
+});
+
+test("webview uses the packaged Prismo logo and repo-aware panel", async () => {
+  const record = { commands: {} };
+  const ext = loadExtensionWithMock(record);
+  const ctx = fakeContext();
+  await ext.activate(ctx);
+
+  const messages = [];
+  const mockWebview = {
+    options: undefined,
+    html: "",
+    cspSource: "vscode-webview:",
+    asWebviewUri: (uri) => `vscode-resource:${uri.fsPath || uri.toString()}`,
+    onDidReceiveMessage: () => ({ dispose() {} }),
+    postMessage: async (message) => { messages.push(message); return true; },
+  };
+
+  record.viewProvider.provider.resolveWebviewView({ webview: mockWebview });
+
+  assert.match(mockWebview.html, /<img src="[^"]*media\/icon\.png" alt="Prismo"/);
+  assert.match(mockWebview.html, /Copy shield command/);
+  assert.deepEqual(mockWebview.options.localResourceRoots[0].fsPath, "/tmp/prismo-extension/media");
   ext.deactivate();
 });
 

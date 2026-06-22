@@ -74,6 +74,10 @@
         "title": "Prismo: Sync now"
       },
       {
+        "command": "prismo.copyShieldCommand",
+        "title": "Prismo: Copy shield command"
+      },
+      {
         "command": "prismo.signOut",
         "title": "Prismo: Sign out"
       },

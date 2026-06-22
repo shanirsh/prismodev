@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import * as os from "os";
 import * as crypto from "crypto";
+import * as path from "path";
 
 // Publisher.name — the authority used in the editor callback URI.
 const EXTENSION_ID = "prismo.prismo";
@@ -47,6 +48,10 @@ let syncTimer: ReturnType<typeof setInterval> | undefined;
 let lastWastePercent: number | undefined;
 let lastProjectedPerDev: number | undefined;
 let lastPlan: string | undefined;
+let lastVerifiedDollars: number | undefined;
+let lastLiveTokensPrevented: number | undefined;
+let lastProactiveEvents: number | undefined;
+let lastRepairsCompleted: number | undefined;
 let isSignedIn = false;
 let connectedEmail: string | undefined;
 let isSyncing = false;
@@ -56,10 +61,15 @@ let viewProvider: PrismoViewProvider | undefined;
 class PrismoViewProvider implements vscode.WebviewViewProvider {
   private view?: vscode.WebviewView;
 
+  constructor(private readonly context: vscode.ExtensionContext) {}
+
   resolveWebviewView(view: vscode.WebviewView) {
     this.view = view;
-    view.webview.options = { enableScripts: true };
-    view.webview.html = this.html();
+    view.webview.options = {
+      enableScripts: true,
+      localResourceRoots: [vscode.Uri.joinPath(this.context.extensionUri, "media")],
+    };
+    view.webview.html = this.html(view.webview);
     view.webview.onDidReceiveMessage((msg: { command?: string }) => {
       if (msg.command) void vscode.commands.executeCommand(msg.command);
     });
@@ -74,34 +84,42 @@ class PrismoViewProvider implements vscode.WebviewViewProvider {
       wastePercent: lastWastePercent,
       projectedPerDev: lastProjectedPerDev,
       plan: lastPlan,
+      repo: currentWorkspaceName(),
+      verifiedDollars: lastVerifiedDollars,
+      liveTokensPrevented: lastLiveTokensPrevented,
+      proactiveEvents: lastProactiveEvents,
+      repairsCompleted: lastRepairsCompleted,
       syncing: isSyncing,
       lastSyncedAt: lastSyncedAt,
     });
   }
 
-  private html(): string {
+  private html(webview: vscode.Webview): string {
+    const logoUri = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, "media", "icon.png"));
     return `<!doctype html><html><head><meta charset="utf-8" />
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline';" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource}; style-src 'unsafe-inline'; script-src 'unsafe-inline';" />
 <style>
-  :root { --accent: #8a5cf6; }
+  :root { --accent: #8a5cf6; --panel: var(--vscode-sideBar-background); --soft: var(--vscode-editorWidget-background); }
   * { box-sizing: border-box; }
-  body { font-family: var(--vscode-font-family); color: var(--vscode-foreground); padding: 16px 14px; font-size: 12px; }
-  .brand { display:flex; align-items:center; gap:7px; margin-bottom:18px; }
-  .brand .dot { width:14px; height:14px; border-radius:4px; background:linear-gradient(135deg,#7cd0ff,#b69cff 55%,#ff9ec8); }
-  .brand span { font-weight:600; letter-spacing:.2px; }
-  .eyebrow { color: var(--vscode-descriptionForeground); text-transform:uppercase; letter-spacing:.08em; font-size:10px; font-weight:600; }
-  .metric { margin: 6px 0 2px; font-size: 40px; font-weight: 650; line-height:1; }
+  body { font-family: var(--vscode-font-family); color: var(--vscode-foreground); padding: 18px 14px; font-size: 12px; margin:0; }
+  .brand { display:flex; align-items:center; gap:9px; margin-bottom:18px; }
+  .logo { width:24px; height:24px; border-radius:7px; box-shadow:0 8px 22px rgba(88,72,214,.22); }
+  .brand span { font-weight:700; letter-spacing:0; font-size:13px; }
+  .eyebrow { color: var(--vscode-descriptionForeground); text-transform:uppercase; letter-spacing:.08em; font-size:10px; font-weight:700; }
+  .metric { margin: 6px 0 2px; font-size: 38px; font-weight: 720; line-height:1; letter-spacing:0; }
   .metric.high { color:#f0616d; } .metric.mid { color:#e0a23a; } .metric.low { color:#3fb27f; }
   .metriclabel { color: var(--vscode-descriptionForeground); font-size:12px; }
-  .account { margin:10px 0 14px; padding:8px 10px; border:1px solid var(--vscode-panel-border); border-radius:8px; color:var(--vscode-descriptionForeground); }
-  .account strong { display:block; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--vscode-foreground); font-weight:500; }
-  .projected { margin:14px 0 4px; padding:10px 12px; border:1px solid var(--vscode-panel-border); border-radius:8px; }
-  .projected .n { font-size:18px; font-weight:600; }
-  .projected .l { color: var(--vscode-descriptionForeground); font-size:11px; margin-top:2px; }
-  .actions { margin-top:16px; }
+  .account { margin:10px 0 14px; padding:10px 11px; border:1px solid var(--vscode-panel-border); border-radius:8px; color:var(--vscode-descriptionForeground); background:color-mix(in srgb, var(--soft) 55%, transparent); }
+  .account strong, .account span { display:block; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--vscode-foreground); font-weight:600; }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:14px 0 4px; }
+  .tile { padding:10px; border:1px solid var(--vscode-panel-border); border-radius:8px; min-height:68px; background:color-mix(in srgb, var(--soft) 45%, transparent); }
+  .tile .n { font-size:17px; line-height:1.15; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .tile .l { color: var(--vscode-descriptionForeground); font-size:10.5px; margin-top:4px; line-height:1.25; }
+  .actions { margin-top:16px; display:grid; gap:7px; }
   button { display:flex; align-items:center; justify-content:center; width:100%; margin:7px 0; padding:8px 10px;
     border:none; border-radius:6px; font-size:12px; font-weight:500; cursor:pointer;
     background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
+  .actions button { margin:0; }
   button:hover { background: var(--vscode-button-hoverBackground); }
   button.secondary { background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); }
   button:disabled { opacity:.6; cursor:default; }
@@ -111,7 +129,7 @@ class PrismoViewProvider implements vscode.WebviewViewProvider {
   .lead { color: var(--vscode-descriptionForeground); line-height:1.5; margin:0 0 16px; }
   .hidden { display:none; }
 </style></head><body>
-  <div class="brand"><span class="dot"></span><span>Prismo</span></div>
+  <div class="brand"><img src="${logoUri}" alt="Prismo" class="logo" /><span>Prismo</span></div>
 
   <div id="signedout">
     <div class="eyebrow">Agent efficiency</div>
@@ -120,20 +138,35 @@ class PrismoViewProvider implements vscode.WebviewViewProvider {
   </div>
 
   <div id="signedin" class="hidden">
-    <div class="account">Connected as<strong id="email">Prismo account</strong></div>
+    <div class="account">Connected as<strong id="email">Prismo account</strong><span id="repo">Watching workspace</span></div>
 
     <div class="eyebrow">Avoidable waste</div>
     <div class="metric" id="waste">—</div>
     <div class="metriclabel">of your agent tokens</div>
 
-    <div class="projected hidden" id="projbox">
-      <div class="n" id="projn"></div>
-      <div class="l">projected per developer, at this rate</div>
+    <div class="grid">
+      <div class="tile hidden" id="projbox">
+        <div class="n" id="projn"></div>
+        <div class="l">projected per dev</div>
+      </div>
+      <div class="tile hidden" id="savedbox">
+        <div class="n" id="savedn"></div>
+        <div class="l">verified saved</div>
+      </div>
+      <div class="tile hidden" id="livebox">
+        <div class="n" id="liven"></div>
+        <div class="l">live prevented</div>
+      </div>
+      <div class="tile hidden" id="controlsbox">
+        <div class="n" id="controlsn"></div>
+        <div class="l">controls run</div>
+      </div>
     </div>
 
     <div class="actions">
-      <button onclick="send('prismo.openDashboard')">Open dashboard</button>
       <button class="secondary" id="syncbtn" onclick="send('prismo.syncNow')">Sync now</button>
+      <button onclick="send('prismo.openDashboard')">Open dashboard</button>
+      <button class="secondary" onclick="send('prismo.copyShieldCommand')">Copy shield command</button>
       <button class="upgrade hidden" id="upgrade" onclick="send('prismo.upgrade')">Upgrade for team metrics</button>
       <button class="secondary" onclick="send('prismo.signOut')">Sign out</button>
     </div>
@@ -144,6 +177,7 @@ class PrismoViewProvider implements vscode.WebviewViewProvider {
 <script>
   const vscode = acquireVsCodeApi();
   function send(command){ vscode.postMessage({ command }); }
+  function compact(n){ if(n === undefined || n === null) return '—'; if(n>=1000000) return (n/1000000).toFixed(n>=10000000?0:1)+'M'; if(n>=1000) return (n/1000).toFixed(n>=10000?0:1)+'k'; return String(Math.round(n)); }
   function ago(ts){ if(!ts) return ''; const s=Math.round((Date.now()-ts)/1000);
     if(s<10) return 'just now'; if(s<60) return s+'s ago'; const m=Math.round(s/60); if(m<60) return m+'m ago'; return Math.round(m/60)+'h ago'; }
   window.addEventListener('message', (e) => {
@@ -152,11 +186,21 @@ class PrismoViewProvider implements vscode.WebviewViewProvider {
     document.getElementById('signedin').classList.toggle('hidden', !s.signedIn);
     const w = document.getElementById('waste');
     document.getElementById('email').textContent = s.email || 'Prismo account';
+    document.getElementById('repo').textContent = s.repo ? 'Watching ' + s.repo : 'Watching this workspace';
     if (s.wastePercent === undefined || s.wastePercent === null) { w.textContent = '—'; w.className='metric'; }
     else { w.textContent = s.wastePercent + '%'; w.className = 'metric ' + (s.wastePercent>=40?'high':s.wastePercent>=20?'mid':'low'); }
     const hasProj = s.projectedPerDev > 0;
     document.getElementById('projbox').classList.toggle('hidden', !hasProj);
     if (hasProj) document.getElementById('projn').textContent = '$' + Math.round(s.projectedPerDev).toLocaleString() + '/yr';
+    const hasSaved = s.verifiedDollars > 0;
+    document.getElementById('savedbox').classList.toggle('hidden', !hasSaved);
+    if (hasSaved) document.getElementById('savedn').textContent = '$' + Math.round(s.verifiedDollars).toLocaleString();
+    const hasLive = s.liveTokensPrevented > 0;
+    document.getElementById('livebox').classList.toggle('hidden', !hasLive);
+    if (hasLive) document.getElementById('liven').textContent = compact(s.liveTokensPrevented);
+    const controls = s.repairsCompleted || s.proactiveEvents;
+    document.getElementById('controlsbox').classList.toggle('hidden', !(controls > 0));
+    if (controls > 0) document.getElementById('controlsn').textContent = compact(controls);
     document.getElementById('upgrade').classList.toggle('hidden', s.plan !== 'free');
     const btn = document.getElementById('syncbtn');
     btn.disabled = !!s.syncing; btn.textContent = s.syncing ? 'Syncing…' : 'Sync now';
@@ -201,7 +245,18 @@ type Digest = {
   wastePercent?: number;
   projectedAnnualPerDeveloper?: number;
   verifiedDollarsSaved?: number;
+  verifiedSavedDollars?: number;
+  liveTokensPrevented?: number;
+  proactiveEvents?: number;
+  proactivityEvents?: number;
+  repairsCompleted?: number;
+  interventionsCompleted?: number;
 };
+
+function currentWorkspaceName(): string | undefined {
+  const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  return root ? path.basename(root) : undefined;
+}
 
 async function fetchDigest(apiBase: string, token: string): Promise<Digest | null> {
   try {
@@ -316,6 +371,10 @@ async function runSync(context: vscode.ExtensionContext, opts: { silent?: boolea
       if (typeof digest.wastePercent === "number") lastWastePercent = digest.wastePercent;
       lastProjectedPerDev = digest.projectedAnnualPerDeveloper;
       lastPlan = digest.plan;
+      lastVerifiedDollars = digest.verifiedDollarsSaved ?? digest.verifiedSavedDollars;
+      lastLiveTokensPrevented = digest.liveTokensPrevented;
+      lastProactiveEvents = digest.proactiveEvents ?? digest.proactivityEvents;
+      lastRepairsCompleted = digest.repairsCompleted ?? digest.interventionsCompleted;
       await maybeNudgeUpgrade(context, digest);
     }
     await updateStatusBar(context);
@@ -358,7 +417,7 @@ export async function activate(context: vscode.ExtensionContext) {
   statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
   context.subscriptions.push(statusBar);
 
-  viewProvider = new PrismoViewProvider();
+  viewProvider = new PrismoViewProvider(context);
   context.subscriptions.push(vscode.window.registerWebviewViewProvider("prismo.home", viewProvider));
 
   // Catch the browser redirect: <scheme>://prismo.prismo/auth?token=…&state=…
@@ -414,6 +473,11 @@ export async function activate(context: vscode.ExtensionContext) {
     }),
 
     vscode.commands.registerCommand("prismo.syncNow", () => runSync(context)),
+
+    vscode.commands.registerCommand("prismo.copyShieldCommand", async () => {
+      await vscode.env.clipboard.writeText("npx -y getprismo@latest shield -- <command>");
+      vscode.window.showInformationMessage("Copied Prismo shield command. Replace <command> with your noisy test or build command.");
+    }),
 
     vscode.commands.registerCommand("prismo.showLogs", () => output.show()),
   );
