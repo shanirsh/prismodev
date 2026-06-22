@@ -144,11 +144,9 @@ staticfiles/
 static_collected/
 .claude/worktrees/
 
-# Added by PrismoDev
+# Prismo local/generated output
 .prismo/
-
-# Added by PrismoDev
 .claude/
-
-# Added by PrismoDev
 *.prismo-backup
+extension/*.vsix
+*.map

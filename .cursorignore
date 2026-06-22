@@ -146,8 +146,8 @@ static_collected/
 .prismo/
 prismo-optimized-CLAUDE.template.md
 
-# Added by PrismoDev
+# Prismo local/generated output
 .claude/
-
-# Added by PrismoDev
 *.prismo-backup
+extension/*.vsix
+*.map

@@ -1,211 +1,39 @@
-# ============================================
-# Python
-# ============================================
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-
-# Virtual Environments
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-backend/venv/
-backend/env/
-backend/.venv/
-
-# Distribution / Packaging
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-backend/lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-pip-wheel-metadata/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
-
-# PyInstaller
-*.manifest
-*.spec
-
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
-.pytest_cache/
-
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# pyenv
-.python-version
-
-# Celery
-celerybeat-schedule
-celerybeat.pid
-
-# ============================================
-# Node / JavaScript / TypeScript
-# ============================================
+# Dependencies
 node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-lerna-debug.log*
-.pnpm-debug.log*
+extension/node_modules/
 
-# Build outputs
+# Build and package output
 dist/
 build/
-.next/
-out/
-.nuxt/
-.cache/
-.parcel-cache/
-
-# Testing
 coverage/
+extension/dist/
+extension/*.vsix
+*.map
 
-# ============================================
-# Environment Variables
-# ============================================
-.env
-backend/.env
-frontend/.env.local
-docker/backend.env
-docker/frontend.env
-docker/.env
-chroma_db/
-server.log
-.env.local
-.env.*.local
-.env.development.local
-.env.test.local
-.env.production.local
+# Local Prismo dogfooding output
+.prismo/
+*.prismo-backup
+*.bak
 
-# ============================================
-# IDEs and Editors
-# ============================================
-# VSCode
+# Local agent/editor state
+.claude/
 .vscode/
+.idea/
 *.code-workspace
 
-# JetBrains IDEs
-.idea/
-*.iml
-*.iws
-*.ipr
-
-# Vim
-*.swp
-*.swo
-*~
-
-# Emacs
-*~
-\#*\#
-.\#*
-
-# Sublime Text
-*.sublime-project
-*.sublime-workspace
-
-# ============================================
-# Operating System Files
-# ============================================
-# macOS
-.DS_Store
-.AppleDouble
-.LSOverride
-._*
-
-# Windows
-Thumbs.db
-Thumbs.db:encryptable
-ehthumbs.db
-ehthumbs_vista.db
-*.stackdump
-[Dd]esktop.ini
-$RECYCLE.BIN/
-
-# Linux
-*~
-.directory
-.Trash-*
-
-# ============================================
-# Database
-# ============================================
+# Logs, databases, and temporary files
+logs/
+*.log
 *.db
 *.sqlite
 *.sqlite3
-
-# ============================================
-# Logs
-# ============================================
-logs/
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
-
-# ============================================
-# Temporary Files
-# ============================================
 tmp/
 temp/
 *.tmp
-*.bak
-*.swp
-*.swo
 
-# ============================================
-# Project Specific
-# ============================================
-# Alembic
-alembic/versions/__pycache__/
-
-# Uploads (if any)
-uploads/
-media/
-
-# Static files (if generated)
-staticfiles/
-static_collected/
-
-# Claude Code
-.claude/worktrees/
-.claude/
-
-# PrismoDev local output (dogfooding)
-.prismo/
-
-# Prismo backup files (connector regenerates these)
-*.prismo-backup
-
-# Extension marketplace assets (the broad media/ rule above is too greedy)
-!extension/media/
-!extension/media/**
+# Environment and OS files
+.env
+.env.*
+!.env.example
+.DS_Store
+Thumbs.db
