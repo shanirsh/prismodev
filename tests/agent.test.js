@@ -515,6 +515,62 @@ test("agent sends heartbeat on each poll cycle", async () => {
   }
 });
 
+test("agent syncs cloud control policies into the repo", async () => {
+  const { server, url } = await createServer(async (req, res) => {
+    if (req.method === "POST" && req.url === "/v1/dev/workspace/heartbeat") {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ ok: true }));
+      return;
+    }
+    if (req.method === "GET" && req.url === "/v1/dev/workspace/policies/agent") {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({
+        plan: "pro",
+        policies: [{
+          id: "retry-loops",
+          name: "Retry loops",
+          description: "Stop repeated commands.",
+          category: "reliability",
+          mode: "block",
+          enabled: true,
+          config: { maxRetries: 3 },
+          supportedModes: ["detect", "warn", "block"],
+        }],
+      }));
+      return;
+    }
+    if (req.method === "POST" && req.url === "/v1/dev/workspace/live-events") {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ ok: true }));
+      return;
+    }
+    if (req.method === "POST" && req.url === "/v1/dev/workspace/actions/claim?limit=5") {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ actions: [] }));
+      return;
+    }
+    res.writeHead(404);
+    res.end("not found");
+  });
+
+  try {
+    const root = tempDir();
+    const agent = agentWith({
+      loadConfig: () => ({ token: "test-token", apiUrl: url }),
+    });
+
+    const result = await agent.runAgentOnce(root, { syncTelemetry: true });
+    const snapshot = JSON.parse(fs.readFileSync(path.join(root, ".prismo", "control-policies.json"), "utf8"));
+
+    assert.equal(result.policies.synced, true);
+    assert.equal(snapshot.plan, "pro");
+    assert.equal(snapshot.policies[0].id, "retry-loops");
+    assert.equal(snapshot.policies[0].mode, "block");
+  } finally {
+    server.close();
+  }
+});
+
 test("agent publishes Claude enforcement blocks and agent loop signals as live events", async () => {
   const liveEvents = [];
   const { server, url } = await createServer(async (req, res) => {
