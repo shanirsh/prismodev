@@ -115,6 +115,87 @@ test("sync captures Claude Code sessions when the repo path contains spaces", ()
   assert.ok(tools.some((t) => String(t).includes("claude")), `expected a Claude Code session, got tools: ${JSON.stringify(tools)}`);
 });
 
+test("sync preserves Claude Code worker metadata without double-counting parent rollups", () => {
+  const base = tempDir();
+  const prismoHome = tempDir();
+  const claudeHome = tempDir();
+  const root = path.join(base, "app");
+  fs.mkdirSync(path.join(root, "src"), { recursive: true });
+  fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ dependencies: { react: "18.0.0" } }), "utf8");
+
+  const encode = (p) => p.replace(/[\/\\:.\s]/g, "-");
+  let realRoot = root;
+  try { realRoot = fs.realpathSync(root); } catch {}
+  const projectDirs = Array.from(new Set([encode(root), encode(realRoot)]))
+    .map((enc) => path.join(claudeHome, "projects", enc));
+  for (const projectDir of projectDirs) fs.mkdirSync(projectDir, { recursive: true });
+  const parentRows = [
+    JSON.stringify({ type: "summary", summary: "parent work", cwd: root }),
+    JSON.stringify({
+      type: "assistant",
+      timestamp: "2026-06-12T10:01:00Z",
+      requestId: "req-parent",
+      message: {
+        id: "msg-parent",
+        role: "assistant",
+        model: "claude-sonnet-4-20250514",
+        usage: { input_tokens: 1000, output_tokens: 200 },
+        content: [{ type: "text", text: "parent session" }],
+      },
+    }),
+  ].join("\n");
+  const workerRows = [
+    JSON.stringify({
+      type: "tool_permission",
+      timestamp: "2026-06-12T10:02:00Z",
+      cwd: root,
+      parentSessionId: "parent",
+      workerId: "worker-1",
+      toolUseId: "toolu_123",
+      permissionRequestId: "perm_123",
+    }),
+    JSON.stringify({
+      type: "assistant",
+      timestamp: "2026-06-12T10:03:00Z",
+      requestId: "req-worker",
+      message: {
+        id: "msg-worker",
+        role: "assistant",
+        model: "claude-sonnet-4-20250514",
+        usage: { input_tokens: 500, output_tokens: 100 },
+        content: [{ type: "text", text: "worker session" }],
+      },
+    }),
+  ].join("\n");
+  for (const projectDir of projectDirs) {
+    fs.writeFileSync(path.join(projectDir, "parent.jsonl"), parentRows, "utf8");
+    fs.writeFileSync(path.join(projectDir, "worker.jsonl"), workerRows, "utf8");
+  }
+
+  const env = {
+    PRISMO_HOME: prismoHome,
+    PRISMO_CLAUDE_HOME: claudeHome,
+    PRISMO_CODEX_HOME: path.join(base, "none"),
+    PRISMO_CURSOR_HOME: path.join(base, "none"),
+    PRISMO_CURSOR_APP_SUPPORT: path.join(base, "none"),
+  };
+  const res = runPrismo(["sync", "--dry-run", "--json", "--limit", "5"], { env, cwd: root });
+  assert.equal(res.status, 0, res.stderr);
+  const payload = JSON.parse(res.stdout).payload;
+  const parent = payload.sessions.find((s) => s.sessionId === "parent");
+  const worker = payload.sessions.find((s) => s.sessionId === "worker");
+  assert.equal(parent.accounting.countsTowardTotals, true);
+  assert.equal(parent.accounting.sourceOfTruth, "claude-code-jsonl");
+  assert.equal(worker.run.role, "worker");
+  assert.equal(worker.run.parentSessionId, "parent");
+  assert.equal(worker.run.workerId, "worker-1");
+  assert.equal(worker.run.toolUseId, "toolu_123");
+  assert.equal(worker.run.permissionRequestId, "perm_123");
+  assert.equal(worker.accounting.countsTowardTotals, false);
+  assert.equal(worker.accounting.sourceOfTruth, "parent-session-rollup");
+  assert.equal(payload.aggregate.displayTokens, parent.tokens.display);
+});
+
 test("sync --all-repos captures sessions from multiple repos, each attributed to its own repo", () => {
   const base = tempDir();
   const prismoHome = tempDir();

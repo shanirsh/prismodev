@@ -42,6 +42,9 @@ Per session (numbers and category labels only):
 | token totals | display/context/exact/tool-output token counts |
 | waste estimate | wasted tokens, waste percent, top cause label (e.g. `tool-output-flood`) |
 | signals | counts of repeated file reads, artifact mentions, repeated commands; loop suspicion boolean |
+| run/accounting metadata | leader/worker role, parent session id, worker id, tool-use id, permission-request id, and whether this run counts toward totals |
+
+Run/accounting metadata exists so Claude Code worker/subagent activity can be shown without double-counting tokens when the parent session already includes the worker's usage. These are local log identifiers only; they do not include prompts, code, or command output.
 
 Plus a repo scan summary (score, risk level, issue counts — not file contents) and the aggregate totals of the above.
 
